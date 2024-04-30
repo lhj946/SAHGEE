@@ -1,0 +1,23 @@
+exports.Precipitation = function(table,start_year,s_month,s_day,e_month,e_day,scale){
+  var pkgs = require('users/liuhj946/susceptibility:0pkgs');
+  var rain_dataset = ee.ImageCollection('UCSB-CHG/CHIRPS/DAILY').select('precipitation');
+  // 统计年最大日降雨数据，计算区域内的最大值的均值
+  var start_year_str = pkgs.num_str(start_year);
+  //var end_year_str = pkgs.num_str(end_year);
+  var s_month_str = pkgs.num_str(s_month);
+  var s_day_str = pkgs.num_str(s_day);
+  var e_month_str = pkgs.num_str(e_month);
+  var e_day_str = pkgs.num_str(e_day);
+  var rain_str = ee.String('rain');
+  //var yearList = ee.List.sequence(start_year, end_year);
+  var gridcoll = ee.FeatureCollection(table);
+  
+  var start_date = pkgs.num_str(start_year).cat('-').cat(s_month_str)
+                    .cat('-').cat(s_day_str);
+  var end_date = pkgs.num_str(ee.Number(start_year).add(1))
+                    .cat('-').cat(e_month_str)
+                    .cat('-').cat(e_day_str);
+  var year_rain = rain_dataset.filterDate(start_date, end_date).max().resample('bicubic');
+  return pkgs.iter_mean('rain', year_rain, gridcoll, scale);
+  
+}

@@ -1,0 +1,24 @@
+exports.NDVI = function(table,start_year,s_month,s_day,e_month,e_day,scale){
+  var pkgs = require('users/liuhj946/susceptibility:0pkgs');
+  // 统计区域内NDVI的年均值与标准差
+  // 设置开始年月日与终止年月日
+  var NDVI_dataset = ee.ImageCollection("LANDSAT/LE07/C02/T1_8DAY_NDVI").select('NDVI');
+  var start_year_str = pkgs.num_str(start_year);
+  //var end_year_str = pkgs.num_str(end_year);
+  var s_month_str = pkgs.num_str(s_month);
+  var s_day_str = pkgs.num_str(s_day);
+  var e_month_str = pkgs.num_str(e_month);
+  var e_day_str = pkgs.num_str(e_day);
+  var ndvi_str = ee.String('ndvi');
+  //var yearList = ee.List.sequence(start_year, end_year);
+  var gridcoll = ee.FeatureCollection(table);
+  
+  var start_date = (ee.Algorithms.String(start_year)).cat('-').cat(s_month_str)
+                    .cat('-').cat(s_day_str);
+  var end_date = ee.Algorithms.String(ee.Number(start_year).add(1))
+                    .cat('-').cat(e_month_str)
+                    .cat('-').cat(e_day_str);
+  var year_ndvi = NDVI_dataset.filterDate(start_date, end_date).mean();
+  return pkgs.iter_mean_std('ndvi', year_ndvi, gridcoll, scale);
+  
+}

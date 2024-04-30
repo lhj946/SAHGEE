@@ -1,0 +1,59 @@
+var pkgs = require('users/liuhj946/susceptibility:0pkgs');
+var Visualization = require('users/liuhj946/susceptibility:8Visualization');
+
+exports.LA = function(data, LA_columns){
+  // 计算04-10年滑坡规模，属性名为LA
+  var LA = function(year){
+    var traindata = data.filter(ee.Filter.neq('year',year));
+    var testdata = data.filter(ee.Filter.eq('year',year));
+    var classifier = ee.Classifier.smileRandomForest(120).train({
+        features: traindata,
+        classProperty: 'ls_area',
+        inputProperties: LA_columns
+      });
+    var rf_classifier = classifier.setOutputMode('REGRESSION');
+    var areaFit = testdata.classify(rf_classifier,'LA').select(['id','LA','year','ls_area','area']);
+    return areaFit;
+  };
+  // 每年滑坡规模预测
+  var LA2004 = LA(2004);
+  var LA2005 = LA(2005);
+  var LA2006 = LA(2006);
+  var LA2007 = LA(2007);
+  var LA2008 = LA(2008);
+  var LA2009 = LA(2009);
+  var LA2010 = LA(2010);
+  
+  var area_Tables = {
+    'LA2004':LA2004,
+    'LA2005':LA2005,
+    'LA2006':LA2006,
+    'LA2007':LA2007,
+    'LA2008':LA2008,
+    'LA2009':LA2009,
+    'LA2010':LA2010
+  };
+  
+  // 合并面积结果
+  var area_col = ee.FeatureCollection([LA2004,LA2005,LA2006,LA2007,LA2008,LA2009,LA2010]).flatten();
+  // 对面积值归一化
+  var LA_FC = pkgs.standardization(area_col, 'LA');
+  // 将面积归一化后的结果重新分配到每年
+  var A2004 = LA_FC.filter(ee.Filter.eq('year',2004));
+  var A2005 = LA_FC.filter(ee.Filter.eq('year',2005));
+  var A2006 = LA_FC.filter(ee.Filter.eq('year',2006));
+  var A2007 = LA_FC.filter(ee.Filter.eq('year',2007));
+  var A2008 = LA_FC.filter(ee.Filter.eq('year',2008));
+  var A2009 = LA_FC.filter(ee.Filter.eq('year',2009));
+  var A2010 = LA_FC.filter(ee.Filter.eq('year',2010));
+  var LA_Tables = {
+    'LA_2004':A2004,
+    'LA_2005':A2005,
+    'LA_2006':A2006,
+    'LA_2007':A2007,
+    'LA_2008':A2008,
+    'LA_2009':A2009,
+    'LA_2010':A2010
+  };
+  return {'area_Tables':area_Tables, 'LA_Tables':LA_Tables}
+}

@@ -1,0 +1,729 @@
+var Evaluation = require('users/liuhj946/susceptibility:7Evaluation');
+var SCV = require('users/liuhj946/susceptibility:6SCV');
+var pkgs = require('users/liuhj946/susceptibility:0pkgs');
+var animation = require('users/gena/packages:animation')
+
+//===============================================================================
+// Generate tp, tn, fp, fn images of prediction results and visualize them according to feature type
+exports.tfpnVis = function(LS_table){
+  var roc = Evaluation.ROC('LS', LS_table, 'label');
+  var visStyles = ee.Dictionary({
+    tp:{color:'ef476f'},
+    fn:{color:'ffd166'},
+    tn:{color:'06d6a0'},
+    fp:{color:'118ab2'},
+  });
+  var Confusionmatrix = Evaluation.Confusionmatrix('LS', LS_table, 'label', roc['ROC_best']);
+  var matrix = Confusionmatrix['matrix'];
+  matrix = matrix.map(function(feature) {
+    return feature.set('style', visStyles.get(feature.get('tfpn')));
+  });
+  var visImage = matrix.style({
+    styleProperty: 'style'
+  });
+  return visImage;
+}
+
+exports.tableVis = function(table, column, classList, typeColors){
+  
+  var data = table.map(function(feature){
+    var value = feature.getNumber(column);
+    var type = ee.Algorithms.If({
+      condition: value.lte(classList.get(0)),
+      trueCase: 1,
+      falseCase: ee.Algorithms.If({
+        condition: value.lte(classList.get(1)),
+        trueCase: 2,
+        falseCase: ee.Algorithms.If({
+          condition: value.lte(classList.get(2)),
+          trueCase: 3,
+          falseCase: ee.Algorithms.If({
+            condition: value.lte(classList.get(3)),
+            trueCase: 4,
+            falseCase: 5
+          })
+        })
+      })
+    });
+    return feature.set('type', type);
+  });
+  data = data.map(function(feature) {
+    return feature.set('style', typeColors.get(feature.get('type')));
+  });
+  var visImage = data.style({
+    styleProperty: 'style'
+  });
+  return visImage;
+}
+
+// Show Susceptibility, Confusion matrix, Susceptibility Evaluation and spatial cross validation
+exports.LeftMapSelector = function(LS_Images, matrixImages, LS_Tables, scvTable,
+                                    columns, grids, serial, customMap) {
+  
+  var LStitle = ui.Label({
+    value: 'Select Susceptibility Result',
+    style: {backgroundColor :'a8dadc', fontWeight: 'bold', textAlign:'center', margin:'0px 0px'}
+  });
+  var selectLS = ui.Select({
+    items: Object.keys(LS_Images), 
+    onChange: function updateLSMap(selection) {
+      var layer = ui.Map.Layer(LS_Images[selection],null,selection);
+      var top = customMap.layers().length();
+      customMap.layers().set(top, layer);
+    }, 
+    placeholder:'Susceptibility Map'
+  });
+  var hideLayerButton1 = hideTopLayerButton('LS', customMap);
+  var combination1 = ui.Panel({
+    widgets:[selectLS, hideLayerButton1],
+    layout: ui.Panel.Layout.Flow('horizontal'),
+    style: {backgroundColor: 'a8dadc',margin:'0px 0px'}
+  });
+  
+  var confusionTitle = ui.Label({
+    value: 'Select Confusion Matrix Result',
+    style: {backgroundColor :'a8dadc', fontWeight: 'bold', textAlign:'center',margin:'0px 0px'}
+  });
+  var selectMatrix = ui.Select({
+    items: Object.keys(matrixImages), 
+    onChange: function(selection){
+      var layer = ui.Map.Layer(matrixImages[selection],null,selection);
+      var top = customMap.layers().length();
+      customMap.layers().set(top, layer);
+    }, 
+    placeholder:'Confusion Map'
+  });
+  var hideLayerButton2 = hideTopLayerButton('matrix',customMap);
+  var combination2 = ui.Panel({
+    widgets:[selectMatrix, hideLayerButton2],
+    layout: ui.Panel.Layout.Flow('horizontal'),
+    style: {backgroundColor: 'a8dadc',margin:'0px 0px'}
+  });
+  
+  var susTitle = ui.Label({
+    value: 'Select ROC/AUC/Indexs Of SUS',
+    style: {backgroundColor :'a8dadc', fontWeight: 'bold',textAlign:'center',margin:'0px 0px'}
+  });
+  var susPanel = SUS_ROC_AUC_Index(LS_Tables,customMap);
+  
+  var scvTitle = ui.Label({
+    value: 'Select ROC/AUC/Indexs Of SCV',
+    style: {backgroundColor :'a8dadc', fontWeight: 'bold', textAlign:'center',margin:'0px 0px'}
+  });
+  var scvPanel = SCV_ROC_AUC_Index(scvTable, columns, grids, serial, customMap);
+  
+  var selectPanel = ui.Panel({
+    widgets: [LStitle, combination1, confusionTitle, combination2, susTitle, susPanel,
+              scvTitle, scvPanel],
+    style: {position: 'top-left', backgroundColor :'a8dadc'}
+  });
+  customMap.add(selectPanel);
+}
+
+// show area prediction/result evaluation, hazard prediction
+exports.RightMapSelector = function(LA_Images, LA_Tables, areaSCVTables, LA_columns, grids, serial, Hazard_Images, customMap){
+  
+  var areaTitle =  ui.Label({
+    value: 'Select Area Map Of Prediction',
+    style: {backgroundColor :'a8dadc', fontWeight: 'bold', textAlign:'center'}
+  });
+  
+  var selectArea = ui.Select({
+    items: Object.keys(LA_Images), 
+    onChange: function(selection) {
+      var layer = ui.Map.Layer(LA_Images[selection],null,selection);
+      var top = customMap.layers().length();
+      customMap.layers().set(top, layer);
+    }, 
+    placeholder:'Area Map Of Prediction'
+  });
+  
+  var hideLayerButton1 = hideTopLayerButton('LA',customMap);
+  
+  var combination1 = ui.Panel({
+    widgets:[selectArea, hideLayerButton1],
+    layout: ui.Panel.Layout.Flow('horizontal'),
+    style: {backgroundColor: 'a8dadc'}
+  });
+  
+  var assessmentTitle = ui.Label({
+    value: 'Select Assessment Of Area Map',
+    style: {backgroundColor :'a8dadc', fontWeight: 'bold', textAlign:'center'}
+  });
+  
+  var assessAreaPanel = area_evaluate(LA_Tables,customMap);
+  var areaSCV = area_scv(areaSCVTables, LA_columns,grids,serial,customMap);
+  
+  var combination2 = ui.Panel({
+    widgets:[assessAreaPanel, areaSCV],
+    layout: ui.Panel.Layout.Flow('horizontal'),
+    style: {backgroundColor: 'a8dadc'}
+  });
+  
+  var hazardTitle = ui.Label({
+    value: 'Select Hazard Map Of Prediction',
+    style: {backgroundColor :'a8dadc', fontWeight: 'bold', textAlign:'center'}
+  });
+  
+  var hazardSelect = ui.Select({
+    items: Object.keys(Hazard_Images), 
+    onChange: function(selection) {
+      var layer = ui.Map.Layer(Hazard_Images[selection],null,selection);
+      var top = customMap.layers().length();
+      customMap.layers().set(top, layer);
+    }, 
+    placeholder:'Hazard Map Of Prediction'
+  });
+  
+  var hideLayerButton2 = hideTopLayerButton('Hazard',customMap);
+  
+  var combination3 = ui.Panel({
+    widgets:[hazardSelect, hideLayerButton2],
+    layout: ui.Panel.Layout.Flow('horizontal'),
+    style: {backgroundColor: 'a8dadc'}
+  });
+  
+  var selectPanel = ui.Panel({
+    widgets: [areaTitle, combination1, assessmentTitle, combination2, hazardTitle, combination3],
+    style: {position: 'top-right', backgroundColor :'a8dadc'}
+  });
+
+  customMap.add(selectPanel);
+}
+
+// Create susceptibility and confusion matrix legend
+exports.LegendLeft = function(LSvisParams, customMap) {
+  var legend = ui.Panel({ style: {width: '200px', position: 'bottom-left'}});
+  
+  var LS_title =  ui.Label({
+    value:'Susceptibility Legend',
+    style: {fontWeight: 'bold', fontSize: '15px', margin: '0px 15px 5px 15px'}
+  });
+
+  var lon = ee.Image.pixelLonLat().select('longitude');
+  var gradient = lon.multiply(1/100.0);
+  var legendImage = gradient.visualize(LSvisParams);
+
+  var colorBar = ui.Thumbnail({
+    image: legendImage,
+    params: {bbox:'0,0,100,10', dimensions:'180x10'},
+    style: {margin:'0px 10px'}
+  });
+
+  var txtPanel = ui.Panel({
+    widgets: [ui.Label('0'), ui.Label({style: {stretch: 'horizontal'}}),ui.Label('1')],
+    layout: ui.Panel.Layout.flow('horizontal'),
+    style: {stretch: 'horizontal', maxWidth:'200px',height:'25px'}
+  });
+
+  var matrixTilte = ui.Label({
+    value:'Confusion Legend', 
+    style: {fontWeight: 'bold', fontSize: '15px', margin: '10px 20px 10px 20px'}
+  });
+
+  var makeRowa = function(color, name) {
+      var colorBox = ui.Label({style: {backgroundColor: '#' + color,padding: '10px', margin: '0 0 4px 0' }});
+      // Create a label with the description text.
+      var description = ui.Label({value: name,style: {margin: '0 10px 4px 6px'}});
+     // Return the panel
+      return ui.Panel({widgets: [colorBox, description],layout: ui.Panel.Layout.Flow('horizontal')});
+  };
+  
+  var matrixPalette = ['ef476f','ffd166','118ab2','06d6a0'];
+  var matrixName = ['TP','FN','FP','TN'];
+  
+  var matrixPanel1 = ui.Panel({
+    widgets:[makeRowa(matrixPalette[0],matrixName[0]), makeRowa(matrixPalette[1],matrixName[1])],
+    style:{margin: '10px 20px 0px 35px'},
+    layout: ui.Panel.Layout.Flow('horizontal')
+  });
+  var matrixPanel2 = ui.Panel({
+    widgets:[makeRowa(matrixPalette[2],matrixName[2]), makeRowa(matrixPalette[3],matrixName[3])],
+    style:{margin: '10px 20px 0px 35px'},
+    layout: ui.Panel.Layout.Flow('horizontal')
+  });
+  
+  var matrixPanel = ui.Panel({
+    widgets:[matrixPanel1, matrixPanel2], 
+    layout: ui.Panel.Layout.Flow('vertical')
+  });
+  
+  legend.add(LS_title).add(txtPanel).add(colorBar).add(matrixTilte).add(matrixPanel);
+  customMap.add(legend);
+}
+
+// Generate Area and Hazard Legends
+exports.LegendRight = function(areaParams, haParams, customMap){
+  var legend = ui.Panel({style:{width:'200px', position:'bottom-right'}});
+  
+  var LA_title = ui.Label({
+    value:'Area Legend',
+    style:{fontWeight:'bold', fontSize:'15px', margin:'0px 42px 0px 42px'}
+  });
+  
+  var lon = ee.Image.pixelLonLat().select('longitude');
+  var gradient = lon.multiply(1/100.0);
+  var legendImage = gradient.visualize(areaParams);
+  var colorBar = ui.Thumbnail({
+    image: legendImage,
+    params: {bbox:'0,0,100,10', dimensions:'180x10'},
+    style: {margin:'0px 10px'}
+  });
+  
+  var txtPanel = ui.Panel({
+    widgets: [ui.Label('0'), ui.Label({style: {stretch: 'horizontal'}}),ui.Label('419183(m²)')],
+    layout: ui.Panel.Layout.flow('horizontal'),
+    style: {stretch: 'horizontal', maxWidth:'200px',height:'25px'}
+  });
+    
+  var Hazard_title = ui.Label({
+    value:'Hazard Legend',
+    style:{fontWeight:'bold', fontSize:'15px', margin:'10px 37px 0px 37px'}
+  }); 
+  
+  var lon2 = ee.Image.pixelLonLat().select('longitude');
+  var gradient2 = lon2.multiply(1/100.0);
+  var legendImage2 = gradient2.visualize(haParams);
+  var colorBar2 = ui.Thumbnail({
+    image: legendImage2,
+    params: {bbox:'0,0,100,10', dimensions:'180x10'},
+    style: {margin:'0px 10px'}
+  });
+  
+  var txtPanel2 = ui.Panel({
+    widgets: [ui.Label('0'), ui.Label({style: {stretch: 'horizontal'}}),ui.Label('1')],
+    layout: ui.Panel.Layout.flow('horizontal'),
+    style: {stretch: 'horizontal', maxWidth:'200px',height:'25px'}
+  });
+  
+  legend.add(LA_title).add(txtPanel).add(colorBar).add(Hazard_title).add(txtPanel2).add(colorBar2);
+  customMap.add(legend);
+}
+
+// Acquire Precision, Accuracy, Recall, F1 Score, ROC curve and AUC value
+var SUS_ROC_AUC_Index = function(LS_Tables,customMap){
+  var select = ui.Select({
+    items: Object.keys(LS_Tables),
+    onChange:function panel(choice){
+      var roc = Evaluation.ROC('LS', LS_Tables[choice], 'label');
+      var Confusionmatrix = Evaluation.Confusionmatrix('LS', LS_Tables[choice], 'label', roc['ROC_best']);
+      var indexs = Evaluation.Indexs(Confusionmatrix);
+      
+      var Panel = ui.Panel({style: {width: '280px',position: 'top-center',height:'215px',
+          margin: '0 930px 0 0'  
+      }});
+      
+      var AUC = ee.Number(roc['AUC']).format('%.4f');
+      AUC = ee.Number.parse(AUC);
+      var Accuracy = ee.Number(indexs['accuracy']).format('%.4f');
+      Accuracy = ee.Number.parse(Accuracy);
+      var Precision = ee.Number(indexs['precision']).format('%.4f');
+      Precision = ee.Number.parse(Precision);
+      var Recall = ee.Number(indexs['recall']).format('%.4f');
+      Recall = ee.Number.parse(Recall);
+      var F1_score = ee.Number(indexs['F1_score']).format('%.4f');
+      F1_score = ee.Number.parse(F1_score);
+      
+      var key = ee.List(['AUC', 'Accuracy', 'Precision', 'Recall', 'F1']);
+      var value = ee.Array([AUC, Accuracy, Precision, Recall, F1_score]);
+      var chart = ui.Chart.array.values({array: value, axis: 0, xLabels: key})
+                .setChartType('ColumnChart')
+                .setOptions({
+                  title: 'Evaluation Of SUS',
+                  colors: ['8ecae6'],
+                  legend: {position: 'none'},
+                  style:{fontSize: 20, bold: true},
+                  hAxis: {
+                    title: 'Evaluation Index',
+                    textStyle: {italic: false, bold: false, fontSize: 10},
+                    titleTextStyle: {italic: false, bold: true, fontSize: 10}
+                  },
+                  vAxis: {
+                    title: 'Value',
+                    titleTextStyle: {italic: false, bold: true, fontSize: 10},
+                    viewWindow: {min: 0.5, max: 1},
+                  }
+                });
+      
+      var rocPanel = ui.Panel(roc['chartROC']);
+      
+      var chart2 = ui.Chart.feature.histogram(LS_Tables[choice], 'LS',64)
+                            .setOptions({
+                              title:'Histogram',
+                              hAxis: {  // x-axis
+                                title: 'Susceptibility',
+                                viewWindow: {min: 0, max: 1}
+                              },
+                              vAxis: {  // x-axis
+                                title: 'Frequency'
+                              },
+                              trendlines: {
+                                0: {  // add a trend line to the 1st series
+                                  type: 'polynomial',  // 'liner'or 'polynomial', 'exponential'
+                                  color: 'ffbe0b',
+                                  degree: 4,
+                                  lineWidth: 2,
+                                  opacity: 1,
+                                  visibleInLegend: true,
+                                }
+                              }
+                            });
+      
+      var hideButton = ui.Button({
+        style:{position: 'bottom-center',stretch:'horizontal'},
+        label: 'Close',
+        onClick: function(){
+          Panel.style().set({
+            shown: false
+          });
+          return;
+        }
+      });
+      
+      Panel.add(chart).add(chart2).add(rocPanel).add(hideButton);
+      customMap.add(Panel);
+    },
+    placeholder:'Susceptibility Map'
+  });
+  
+  return select;
+}
+
+// Calculate ROC, AUC, Accuracy, Percision, Recall, F1_sorce for spatial cross validation
+var SCV_ROC_AUC_Index = function(table, columns, grids, serial, customMap){
+  
+  var select = ui.Select({
+    items: Object.keys(serial),
+    onChange:function panel(choice){
+      var scv_res = SCV.SCV(table, columns, 'label', 'id', grids, serial[choice]);
+      var roc = Evaluation.ROC('LS', scv_res['scv'], 'label');
+
+      var Confusionmatrix = Evaluation.Confusionmatrix('LS', scv_res['scv'], 'label', roc['ROC_best']);
+      var indexs = Evaluation.Indexs(Confusionmatrix);
+      
+      var explain = scv_res['explain'];
+      var importance = ee.Dictionary(explain.get('importance'));
+      var ikeys = importance.keys();
+      var ivalue = importance.values();
+      var ichart = ui.Chart.array.values({array: ivalue, axis:0, xLabels:ikeys})
+                    .setChartType('PieChart')
+                    .setOptions({
+                      title: 'The Importance Of Factors',
+                      legend: {position:'right'},
+                      is3D: true,
+                    });
+      
+      var Panel = ui.Panel({style: {width: '280px',position: 'bottom-left',height:'215px'}});
+      
+      var AUC = ee.Number(roc['AUC']).format('%.4f');
+      AUC = ee.Number.parse(AUC);
+      var Accuracy = ee.Number(indexs['accuracy']).format('%.4f');
+      Accuracy = ee.Number.parse(Accuracy);
+      var Precision = ee.Number(indexs['precision']).format('%.4f');
+      Precision = ee.Number.parse(Precision);
+      var Recall = ee.Number(indexs['recall']).format('%.4f');
+      Recall = ee.Number.parse(Recall);
+      var F1_score = ee.Number(indexs['F1_score']).format('%.4f');
+      F1_score = ee.Number.parse(F1_score);
+      
+      var key = ee.List(['AUC', 'Accuracy', 'Precision', 'Recall', 'F1']);
+      var value = ee.Array([AUC, Accuracy, Precision, Recall, F1_score]);
+      var chart = ui.Chart.array.values({array: value, axis: 0, xLabels: key})
+                .setChartType('ColumnChart')
+                .setOptions({
+                  title: 'Evaluation Of SCV',
+                  colors: ['8ecae6'],
+                  legend: {position: 'none'},
+                  style:{fontSize: 20, bold: true},
+                  hAxis: {
+                    title: 'Evaluation Index',
+                    textStyle: {italic: false, bold: false, fontSize: 10},
+                    titleTextStyle: {italic: false, bold: true, fontSize: 10}
+                  },
+                  vAxis: {
+                    title: 'Value',
+                    titleTextStyle: {italic: false, bold: true, fontSize: 10},
+                    viewWindow: {min: 0, max: 1.0},
+                  }
+                });
+      
+      var rocPanel = ui.Panel(roc['chartROC']);
+      
+      var hideButton = ui.Button({
+        style:{position: 'bottom-center',stretch:'horizontal'},
+        label: 'Close',
+        onClick: function(){
+          Panel.style().set({
+            shown: false
+          });
+          return;
+        }
+      });
+      
+      Panel.add(chart).add(rocPanel).add(ichart).add(hideButton);
+      customMap.add(Panel);
+    },
+    placeholder:'Block Of SCV'
+  });
+  
+  return select;
+}
+
+// Generate animation
+exports.animation = function(collection, prefix, yearList, propertyName, customMap){
+  var visparam = {
+    bands: ['vis-red','vis-green','vis-blue']
+  };
+  
+  var col = collection.map(function(img){
+    var idx = ee.Number.parse(img.get('system:index'))
+    return img.set(propertyName, ee.String(prefix).cat(ee.String('_')).cat(pkgs.num_str(yearList.get(idx))));
+  });
+  
+  animation.animate(col, 
+  {
+    vis:visparam,
+    width: '500px',
+    label: propertyName,
+    timeStep: 300,
+    preload: false, 
+    // preloadCount: col.size(), 
+    position: 'bottom-center',
+    // compact: true,
+    map: customMap
+  })
+}
+
+// Remove layers of select
+var hideTopLayerButton = function(prefix,customMap){
+  
+  var button = ui.Button({
+    label:'Close Map',
+    onClick: function(){
+      var layers = customMap.layers();
+      var top = layers.length()-1;
+      var layer = layers.get(top);
+      var layer_name = layer.getName();
+      var name = layer_name.split('_')[0];
+      if(name == prefix){
+        customMap.remove(layer);
+        return;
+      }
+    }
+  });
+  return button;
+}
+
+// Evaluate area prediction results
+var area_evaluate = function(LA_Tables,customMap){
+  var select = ui.Select({
+    items: Object.keys(LA_Tables),
+    onChange:function panel(choice){
+    // Get array of observation and prediction values 
+    var obse = ee.Array(LA_Tables[choice].aggregate_array('ls_area'));
+    var pred = ee.Array(LA_Tables[choice].aggregate_array('LA'));
+    // Compute residuals
+    var resi = obse.subtract(pred);
+    // Compute RMSE and MAE
+    var rmse = resi.pow(2).reduce('mean', [0]).sqrt().get([0]);
+    var mae = resi.abs().reduce('mean', [0]).get([0]);
+    // Compute correlation
+    var correlation = LA_Tables[choice].reduceColumns({
+          reducer: ee.Reducer.spearmansCorrelation(),
+          selectors: ['ls_area','LA']
+        }).get('correlation');
+        
+    var key = ee.List(['RMSE', 'MAE', 'Correlation']);
+    var value = ee.Array([rmse, mae, correlation]);
+    var chart = ui.Chart.array.values({array: value, axis:0, xLabels:key})
+                  .setChartType('Table');
+    var Panel = ui.Panel({style: {width: '220px',position: 'top-right',height:'150px'}});
+    var hideButton = ui.Button({
+          style:{position: 'bottom-center',stretch:'horizontal'},
+          label: 'Close',
+          onClick: function(){
+            Panel.style().set({
+              shown: false
+            });
+            return;
+          }
+        });
+    Panel.add(chart).add(hideButton);
+    customMap.add(Panel);
+    },
+    placeholder:'Assessment Of Area Map'
+  });
+  return select;
+}
+
+// Spatial cross-validation of predicted area results
+var area_scv = function(tables, LA_columns,grids,serial,customMap){
+  var select = ui.Select({
+    items: Object.keys(serial),
+    onChange:function panel(choice){
+    var areaTables = SCV.area_scv(tables, LA_columns, 'ls_area', 'id', grids, serial[choice])['scv'];
+    var explain = SCV.area_scv(tables, LA_columns, 'ls_area', 'id', grids, serial[choice])['explain'];
+    var importance = ee.Dictionary(explain.get('importance'));
+    var ikeys = importance.keys();
+    var ivalue = importance.values();
+    var ichart = ui.Chart.array.values({array: ivalue, axis:0, xLabels:ikeys})
+              .setChartType('PieChart')
+              .setOptions({
+                title: 'The Importance Of Factors',
+                legend: {position:'right'},
+                is3D: true,
+              });
+    // Get array of observation and prediction values 
+    var obse = ee.Array(areaTables.aggregate_array('ls_area'));
+    var pred = ee.Array(areaTables.aggregate_array('LA'));
+    // Compute residuals
+    var resi = obse.subtract(pred);
+    // Compute RMSE and MAE
+    var rmse = resi.pow(2).reduce('mean', [0]).sqrt().get([0]);
+    var mae = resi.abs().reduce('mean', [0]).get([0]);
+    // Compute correlation
+    var correlation = areaTables.reduceColumns({
+          reducer: ee.Reducer.spearmansCorrelation(),
+          selectors: ['ls_area','LA']
+        }).get('correlation');
+        
+    var key = ee.List(['RMSE', 'MAE', 'Correlation']);
+    var value = ee.Array([rmse, mae, correlation]);
+    var chart = ui.Chart.array.values({array: value, axis:0, xLabels:key})
+                  .setChartType('Table');
+    var Panel = ui.Panel({style: {width: '250px',position: 'top-right',height:'150px'}});
+    var hideButton = ui.Button({
+          style:{position: 'bottom-center',stretch:'horizontal'},
+          label: 'Close',
+          onClick: function(){
+            Panel.style().set({
+              shown: false
+            });
+            return;
+          }
+        });
+    Panel.add(chart).add(ichart).add(hideButton);
+    customMap.add(Panel);
+    },
+    placeholder:'Block Of SCV'
+  });
+  return select;
+}
+
+// Statistics of annual proportions of different hazard categories
+exports.hazardChange = function(hazardclass, customMap){
+  var xPropValDict = {
+    'area2004':2004,
+    'area2005':2005,
+    'area2006':2006,
+    'area2007':2007,
+    'area2008':2008,
+    'area2009':2009,
+    'area2010':2010
+  };
+  var xPropLabels = [
+    {f:'2004',v:2004},
+    {f:'2005',v:2005},
+    {f:'2006',v:2006},
+    {f:'2007',v:2007},
+    {f:'2008',v:2008},
+    {f:'2009',v:2009},
+    {f:'2010',v:2010}
+  ];  
+
+  var chart = ui.Chart.feature
+                  .byProperty({
+                    features: hazardclass,
+                    xProperties: xPropValDict,
+                    seriesProperty: 'class'
+                  })
+                  .setSeriesNames([
+                    'very low', 'low', 'medium', 'high', 'very high'
+                    ])
+                  .setChartType('BarChart')
+                  .setOptions({
+                    title: 'Proportion of Hazard Classes',
+                    hAxis: {
+                      title: 'Area Percentage',
+                      titleTextStyle: {italic: false, bold: true},
+                      gridlines: {count: 0}
+                    },
+                    vAxis: {
+                      title: 'year',
+                      titleTextStyle: {italic: false, bold: true},
+                      ticks: xPropLabels
+                    },
+                    colors: ['2e7d32', '66bb6a', 'fff176', 'ffa726', 'e53935'],
+                    isStacked: 'percent',
+                    series: {
+                      5: {visibleInLegend: false}, 6: {visibleInLegend: false}, 7: {visibleInLegend: false}, 
+                      8: {visibleInLegend: false}, 9: {visibleInLegend: false}, 10: {visibleInLegend: false}, 
+                      11: {visibleInLegend: false}, 12: {visibleInLegend: false}, 13: {visibleInLegend: false}, 
+                      14: {visibleInLegend: false}, 15: {visibleInLegend: false}, 16: {visibleInLegend: false}, 
+                      17: {visibleInLegend: false}, 18: {visibleInLegend: false}, 19: {visibleInLegend: false}, 
+                      20: {visibleInLegend: false}, 21: {visibleInLegend: false}, 22: {visibleInLegend: false}, 
+                      23: {visibleInLegend: false}, 24: {visibleInLegend: false}, 25: {visibleInLegend: false}, 
+                      26: {visibleInLegend: false}, 27: {visibleInLegend: false}, 28: {visibleInLegend: false}, 
+                      29: {visibleInLegend: false}, 30: {visibleInLegend: false}, 31: {visibleInLegend: false}, 
+                      32: {visibleInLegend: false}, 33: {visibleInLegend: false}, 34: {visibleInLegend: false}
+                    }
+                  });
+  var Panel = ui.Panel({
+    widgets: [chart],style: {width: '300px',position: 'top-center',height:'220px', margin: '0 0 0 760px'}});  
+    
+  Panel.style().set({shown:false});
+  
+  var checkBox = ui.Checkbox({
+    label: 'Hazard Statistics', 
+    onChange: function(check){
+      Panel.style().set({
+        shown:check
+      });
+    },
+    style: {
+      position:'bottom-right',
+      backgroundColor :'a8dadc'
+    }});
+    
+  customMap.add(checkBox);
+  customMap.add(Panel);
+}
+
+// Generate correlation table between factors
+exports.correlation = function(table, columns, customMap){
+
+  var correlationMatrix = ee.Array(columns.map(function (col1) {
+    var row = columns.map(function (col2) {
+      var correlation = table.reduceColumns({
+        reducer: ee.Reducer.pearsonsCorrelation(),
+        selectors: [col1, col2]
+      }).get('correlation');
+      return correlation;
+    });
+    return row;
+  }));
+
+  var chart = ui.Chart.array.values({array: correlationMatrix, axis:0, xLabels: columns})
+                  .setChartType('Table')
+  
+  var Panel = ui.Panel({
+      widgets: [chart], style: {position: 'bottom-right', width:'300px'}
+    });
+    
+  Panel.style().set({shown:false});
+  
+  var checkBox = ui.Checkbox({
+    label: 'Factor Correlation', 
+    onChange: function(check){
+      Panel.style().set({
+        shown:check
+      });
+    },
+    style: {
+      position:'bottom-right',
+      backgroundColor :'a8dadc'
+    }});
+  
+  customMap.add(checkBox);
+  customMap.add(Panel);
+}

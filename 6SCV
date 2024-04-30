@@ -1,0 +1,73 @@
+// 定义一个随机森林训练器
+var RF_classifier = function(collection,columns,label,tree){
+  return ee.Classifier.smileRandomForest(tree).train({
+    features: collection,
+    classProperty: label,
+    inputProperties: columns
+  });
+};
+
+exports.SCV = function(table,columns,label,fid,grids,i){
+  // 根据每个几何要素生成中心点，生成的中心点包含几何要素所有属性
+  var center =  table.map(function(feature) {
+        return feature.centroid(0.01,table.geometry().projection());
+  });
+  // 将格网转为list
+  var covList = grids.toList(grids.size());
+  var cell = ee.Feature(covList.get(i));
+  // 根据id选择当前方格为测试集，其余为训练集
+  var cell_test = grids.filter(ee.Filter.eq("system:index", cell.get('system:index')));
+  var cell_train = grids.filter(ee.Filter.neq("system:index", cell.get('system:index')));
+  // 选择训练集方格范围里的中心点，转为list，筛选id在list中的几何要素
+  var train_center = center.filterBounds(cell_train.geometry());
+  var list_train = train_center.reduceColumns(ee.Reducer.toList(), [fid]).get('list');
+  var SU_train = table.filter(ee.Filter.inList(fid, list_train));
+  // 选择测试集方格范围里的中心点，转为list，筛选id在list中的几何要素
+  var test_center = center.filterBounds(cell.geometry());
+  var list_test = test_center.reduceColumns(ee.Reducer.toList(), [fid]).get('list');
+  var SU_test = table.filter(ee.Filter.inList(fid, list_test));
+  // 分别获取测试集中的标签为1和0的几何要素数量
+  var check_test_one = ee.Number(SU_test.filter(ee.Filter.eq(label, 1)).size());
+  var check_test_zero = ee.Number(SU_test.filter(ee.Filter.eq(label, 0)).size());
+  // 如果测试集的标签为1和0数量任意一个为0，跳过该方格
+  if (check_test_one==ee.Number(0) || check_test_zero==ee.Number(0)) {
+    
+  } else { 
+    // 将训练集带入随机森林模型训练，并应用训练器得到测试集的结果
+    var classifier = RF_classifier(SU_train,columns,label,70).setOutputMode('PROBABILITY');
+    var explain = classifier.explain();
+    SU_test = ee.FeatureCollection(SU_test);
+    var sus = SU_test.classify(classifier,'LS');
+    var suscell = sus.select([fid,'LS',label,'year']);
+  }
+  //返回测试集结果与方格
+  return {'scv':suscell, 'explain':explain};
+}
+
+exports.area_scv = function(tables, LA_columns,label,fid,grids,i){
+  // 根据每个几何要素生成中心点，生成的中心点包含几何要素所有属性
+  var center =  tables.map(function(feature) {
+        return feature.centroid(0.01,tables.geometry().projection());
+  });
+  // 将格网转为list
+  var covList = grids.toList(grids.size());
+  var cell = ee.Feature(covList.get(i));
+  // 根据id选择当前方格为测试集，其余为训练集
+  var cell_test = grids.filter(ee.Filter.eq("system:index", cell.get('system:index')));
+  var cell_train = grids.filter(ee.Filter.neq("system:index", cell.get('system:index')));
+  // 选择训练集方格范围里的中心点，转为list，筛选id在list中的几何要素
+  var train_center = center.filterBounds(cell_train.geometry());
+  var list_train = train_center.reduceColumns(ee.Reducer.toList(), [fid]).get('list');
+  var SU_train = tables.filter(ee.Filter.inList(fid, list_train));
+  // 选择测试集方格范围里的中心点，转为list，筛选id在list中的几何要素
+  var test_center = center.filterBounds(cell.geometry());
+  var list_test = test_center.reduceColumns(ee.Reducer.toList(), [fid]).get('list');
+  var SU_test = tables.filter(ee.Filter.inList(fid, list_test));
+  // 将训练集带入随机森林模型训练，并应用训练器得到测试集的结果
+  var classifier = RF_classifier(SU_train,LA_columns,label,120).setOutputMode('REGRESSION');
+  var explain = classifier.explain();
+  SU_test = ee.FeatureCollection(SU_test);
+  var area = SU_test.classify(classifier,'LA');
+  var areacell = area.select([fid,'LA',label,'year']);
+  return {'scv':areacell, 'explain':explain};
+}

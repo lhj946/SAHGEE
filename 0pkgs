@@ -1,0 +1,174 @@
+var pkgs = {};
+
+// 导入计算地形因素的方程TAGEE
+var TAGEE = require('users/joselucassafanelli/TAGEE:TAGEE-functions');
+
+// 计算区域内的影像值的平均值与标准差
+pkgs.mean_std = function(image,collection,scale) {
+    return image.reduceRegions({
+      collection: collection,
+      reducer: ee.Reducer.mean().combine({
+        reducer2: ee.Reducer.stdDev(),
+        sharedInputs: true}),
+      scale: scale
+    });
+  };
+
+// 在矢量数据中加入具体属性的平均值列与标准差列
+pkgs.iter_mean_std = function(name,layer,collection,scale){
+  name = ee.String(name);
+  var gridcoll = pkgs.mean_std(layer,collection,scale);
+  gridcoll = gridcoll.map(function(feature) {
+      return feature.set(name.cat('_mean'), feature.get('mean'));
+    });
+  return gridcoll.map(function(feature) {
+      return feature.set(name.cat('_std'), feature.get('stdDev'));
+    });
+  };
+  
+// 计算影像在每个几何单元中的均值
+pkgs.mean = function(image,collection,scale){
+  return image.reduceRegions({
+    collection: collection,
+    reducer: ee.Reducer.mean(),
+    scale: scale
+  });
+};
+
+// 给每个几何单元的均值命名
+pkgs.iter_mean = function(name,layer,collection,scale){
+  name = ee.String(name);
+  var gridcoll = pkgs.mean(layer,collection,scale);
+  return gridcoll.map(function(feature) {
+      return feature.set(name.cat('_mean'), feature.get('mean'));
+    });
+};
+  
+// 数字转字符
+pkgs.num_str = function(num){
+  return ee.Algorithms.String(num);
+};  
+
+// 对表中的一列值标准化到0-1
+pkgs.standardization = function(table, column){
+  
+  var t = ee.FeatureCollection(table);
+
+  var minMax  = t.reduceColumns({
+    reducer: ee.Reducer.minMax(),
+    selectors: [column]
+  });
+  
+  var min = ee.Number(minMax.get('min'));
+  var max = ee.Number(minMax.get('max'));
+  var diff = max.subtract(min);
+  
+  var res = t.map(function(f){
+    var standardvalue = ee.Number(f.get(column)).subtract(min).divide(diff);
+    return f.set(column, standardvalue);
+  });
+  return res;
+};
+
+// 对表中所有因子列作标准化
+pkgs.standardData = function(collection){
+    var res = pkgs.standardization(collection,'Ele_std');
+    res = pkgs.standardization(res,'Ele_mean');
+    res = pkgs.standardization(res,'Slo_std');
+    res = pkgs.standardization(res,'Slo_mean');
+    res = pkgs.standardization(res,'Asp_std');
+    res = pkgs.standardization(res,'Asp_mean');
+    res = pkgs.standardization(res,'Nss_std');
+    res = pkgs.standardization(res,'Nss_mean');
+    res = pkgs.standardization(res,'Ess_std');
+    res = pkgs.standardization(res,'Ess_mean');
+    res = pkgs.standardization(res,'HCv_std');
+    res = pkgs.standardization(res,'HCv_mean');
+    res = pkgs.standardization(res,'VCv_std');
+    res = pkgs.standardization(res,'VCv_mean');
+    res = pkgs.standardization(res,'ndvi_std');
+    res = pkgs.standardization(res,'ndvi_mean');
+    res = pkgs.standardization(res,'rain_mean');
+    return res;
+  }
+
+// 生成格网，x、y分别是横坐标、纵坐标个数
+pkgs.generateGrid = function(table, x, y){
+  var ToGrid = function(xmin, ymin, xmax, ymax, dx, dy) {
+  var xx = ee.List.sequence(xmin, ee.Number(xmax).subtract(0.00000001), dx);
+  var yy = ee.List.sequence(ymin, ee.Number(ymax).subtract(0.00000001), dy);
+  var cells = xx.map(function(x) {
+    return yy.map(function(y) {
+      var x1 = ee.Number(x);
+      var x2 = ee.Number(x).add(ee.Number(dx));
+      var y1 = ee.Number(y);
+      var y2 = ee.Number(y).add(ee.Number(dy));
+      var coords = ee.List([x1, y1, x2, y2]);
+      var rect = ee.Algorithms.GeometryConstructors.Rectangle(coords);
+      return ee.Feature(rect);
+      });
+    }).flatten();  
+    return ee.FeatureCollection(cells);
+  };
+  
+  var bounds = table.geometry().bounds();
+  var coords = ee.List(bounds.coordinates().get(0));
+  var xmin = ee.List(coords.get(0)).get(0);
+  var ymin = ee.List(coords.get(0)).get(1);
+  var xmax = ee.List(coords.get(2)).get(0);
+  var ymax = ee.List(coords.get(2)).get(1);
+  var dx = (ee.Number(xmax).subtract(xmin)).divide(x);//定义横排生成方块个数
+  var dy = (ee.Number(ymax).subtract(ymin)).divide(y);//定义纵排生成方块个数
+  var grid = ToGrid(xmin, ymin, xmax, ymax, dx, dy);
+  var gridf = grid.filterBounds(table);
+  return gridf;
+};
+
+// 转换矢量预测结果到图像,属性为column
+pkgs.transToImage = function(table, columns){
+  var image = table.reduceToImage({
+    properties: columns,
+    reducer: ee.Reducer.first()
+  });
+  return image;
+}
+
+// 生成分位数list
+pkgs.quantile = function(table, List, column){
+  var data = ee.FeatureCollection(table);
+  var list = data.aggregate_array(column).sort();
+  var len = list.size();
+  var per1 = list.get(len.multiply(List[0]).round());
+  var per2 = list.get(len.multiply(List[1]).round());
+  var per3 = list.get(len.multiply(List[2]).round());
+  var per4 = list.get(len.multiply(List[3]).round());
+  var per = ee.List([per1, per2, per3, per4]);
+  return per;
+}
+
+// 统计危险性等级占比
+pkgs.statistics = function(table,year,hazardQuantile){
+  var vlFilter = ee.Filter.lt('hazard', hazardQuantile.get(0));
+  var lFilter = ee.Filter.and(ee.Filter.gte('hazard', hazardQuantile.get(0)),ee.Filter.lt('hazard', hazardQuantile.get(1)));
+  var mFilter = ee.Filter.and(ee.Filter.gte('hazard', hazardQuantile.get(1)),ee.Filter.lt('hazard', hazardQuantile.get(2)));
+  var hFilter = ee.Filter.and(ee.Filter.gte('hazard', hazardQuantile.get(2)),ee.Filter.lt('hazard', hazardQuantile.get(3)));
+  var vhFilter = ee.Filter.gte('hazard', hazardQuantile.get(3));
+  
+  var VL = table.filter(vlFilter).aggregate_sum('area');
+  var L = table.filter(lFilter).aggregate_sum('area');
+  var M = table.filter(mFilter).aggregate_sum('area');
+  var H = table.filter(hFilter).aggregate_sum('area');
+  var VH = table.filter(vhFilter).aggregate_sum('area');
+  
+  var areastr = ee.String('area').cat(pkgs.num_str(year));
+  
+  var vlf = ee.Feature(null).set('year',year).set(areastr,VL).set('class','very low');
+  var lf = ee.Feature(null).set('year',year).set(areastr,L).set('class','low');
+  var mf = ee.Feature(null).set('year',year).set(areastr,M).set('class','medium');
+  var hf = ee.Feature(null).set('year',year).set(areastr,H).set('class','high');
+  var vhf = ee.Feature(null).set('year',year).set(areastr,VH).set('class','very high');
+
+  return ee.FeatureCollection([vlf,lf,mf,hf,vhf]);
+}
+
+exports = pkgs;

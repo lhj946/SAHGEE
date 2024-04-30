@@ -1,0 +1,55 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var table = ee.FeatureCollection("projects/ee-liuhj946/assets/LS/LS_2004"),
+    table2 = ee.FeatureCollection("projects/ee-liuhj946/assets/LS/LS_2005"),
+    table3 = ee.FeatureCollection("projects/ee-liuhj946/assets/LS/LS_2006"),
+    table4 = ee.FeatureCollection("projects/ee-liuhj946/assets/LS/LS_2007"),
+    table5 = ee.FeatureCollection("projects/ee-liuhj946/assets/LS/LS_2008"),
+    table6 = ee.FeatureCollection("projects/ee-liuhj946/assets/LS/LS_2009"),
+    table7 = ee.FeatureCollection("projects/ee-liuhj946/assets/LS/LS_2010"),
+    table8 = ee.FeatureCollection("projects/ee-liuhj946/assets/LA/LA_2004"),
+    table9 = ee.FeatureCollection("projects/ee-liuhj946/assets/LA/LA_2005"),
+    table10 = ee.FeatureCollection("projects/ee-liuhj946/assets/LA/LA_2006"),
+    table11 = ee.FeatureCollection("projects/ee-liuhj946/assets/LA/LA_2007"),
+    table12 = ee.FeatureCollection("projects/ee-liuhj946/assets/LA/LA_2008"),
+    table13 = ee.FeatureCollection("projects/ee-liuhj946/assets/LA/LA_2009"),
+    table14 = ee.FeatureCollection("projects/ee-liuhj946/assets/LA/LA_2010");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+var Hazard = require('users/liuhj946/susceptibility:Hazard');
+var pkgs = require('users/liuhj946/susceptibility:0pkgs');
+// 易发性矢量集合
+var LS_Tables = {
+  'LS_2004':table,
+  'LS_2005':table2,
+  'LS_2006':table3,
+  'LS_2007':table4,
+  'LS_2008':table5,
+  'LS_2009':table6,
+  'LS_2010':table7
+};
+// 规模矢量集合
+var LA_Tables = {
+  'LA_2004':table8,
+  'LA_2005':table9,
+  'LA_2006':table10,
+  'LA_2007':table11,
+  'LA_2008':table12,
+  'LA_2009':table13,
+  'LA_2010':table14
+};
+
+// 危险性矢量集合
+var Hazard_Tables = Hazard.Hazard(LS_Tables, LA_Tables);
+
+var hazardList = [Hazard_Tables['Hazard_2004'],Hazard_Tables['Hazard_2005'],Hazard_Tables['Hazard_2006'],
+                  Hazard_Tables['Hazard_2007'],Hazard_Tables['Hazard_2008'],Hazard_Tables['Hazard_2009'],
+                  Hazard_Tables['Hazard_2010']];
+var nameList = ['Hazard_2004','Hazard_2005','Hazard_2006','Hazard_2007','Hazard_2008','Hazard_2009','Hazard_2010'];
+
+for(var i=0;i<hazardList.length;i++){
+  Export.table.toAsset({
+    collection:hazardList[i],
+    description:nameList[i],
+    assetId:nameList[i],
+    // maxVertices:,
+})
+}
