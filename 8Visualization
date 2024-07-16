@@ -4,7 +4,7 @@ var pkgs = require('users/liuhj946/susceptibility:0pkgs');
 var animation = require('users/gena/packages:animation')
 
 //===============================================================================
-// Generate tp, tn, fp, fn images of prediction results and visualize them according to feature type
+// 混淆矩阵可视化
 exports.tfpnVis = function(LS_table){
   var roc = Evaluation.ROC('LS', LS_table, 'label');
   var visStyles = ee.Dictionary({
@@ -24,8 +24,8 @@ exports.tfpnVis = function(LS_table){
   return visImage;
 }
 
+// 分位数法可视化（5类）
 exports.tableVis = function(table, column, classList, typeColors){
-  
   var data = table.map(function(feature){
     var value = feature.getNumber(column);
     var type = ee.Algorithms.If({
@@ -56,175 +56,157 @@ exports.tableVis = function(table, column, classList, typeColors){
   return visImage;
 }
 
-// Show Susceptibility, Confusion matrix, Susceptibility Evaluation and spatial cross validation
-exports.LeftMapSelector = function(LS_Images, matrixImages, LS_Tables, scvTable,
-                                    columns, grids, serial, customMap) {
-  
-  var LStitle = ui.Label({
-    value: 'Select Susceptibility Result',
-    style: {backgroundColor :'a8dadc', fontWeight: 'bold', textAlign:'center', margin:'0px 0px'}
-  });
-  var selectLS = ui.Select({
-    items: Object.keys(LS_Images), 
+// 选择框函数
+var selector = function(ImagesList,customMap,placeholder, w){
+ var res = ui.Select({
+    items: Object.keys(ImagesList), 
     onChange: function updateLSMap(selection) {
-      var layer = ui.Map.Layer(LS_Images[selection],null,selection);
+      var layer = ui.Map.Layer(ImagesList[selection],null,selection);
       var top = customMap.layers().length();
       customMap.layers().set(top, layer);
     }, 
-    placeholder:'Susceptibility Map'
+    placeholder:placeholder,
+    style: {width: w}
   });
-  var hideLayerButton1 = hideTopLayerButton('LS', customMap);
-  var combination1 = ui.Panel({
-    widgets:[selectLS, hideLayerButton1],
+  return res;
+}
+
+// 两部件并排函数
+var juxtaposition = function(component1, component2){
+  var combination = ui.Panel({
+    widgets:[component1, component2],
     layout: ui.Panel.Layout.Flow('horizontal'),
     style: {backgroundColor: 'a8dadc',margin:'0px 0px'}
   });
+  return combination;
+}
+
+// 标题部件
+var title = function(name, color, mag){
+  color = color || 'a8dadc';
+  mag = mag || '0px 0px';
+  var t = ui.Label({
+    value: name,
+    style: {backgroundColor : color, fontWeight: 'bold', margin: mag}
+  });
+  return t;
+}
+
+// 易发性、混淆矩阵、易发性评价、空间交叉验证评价
+exports.LSSelector = function(LS_Images, matrixImages, LS_Tables, scvTable,
+                                    columns, grids, serial, customMap) {
+  //易发性标题
+  var LStitle = title('Landslide Susceptibility Modeling');
+  //易发性结果选择框
+  var selectLS = selector(LS_Images, customMap, 'Susceptibility Map', '120px');
+  //隐藏最上层的易发性结果
+  var closeLS = hideTopLayerButton('LS', customMap);
+  //将易发性选择框、隐藏按钮并排
+  var combination1 = juxtaposition(selectLS, closeLS);
   
-  var confusionTitle = ui.Label({
-    value: 'Select Confusion Matrix Result',
-    style: {backgroundColor :'a8dadc', fontWeight: 'bold', textAlign:'center',margin:'0px 0px'}
-  });
-  var selectMatrix = ui.Select({
-    items: Object.keys(matrixImages), 
-    onChange: function(selection){
-      var layer = ui.Map.Layer(matrixImages[selection],null,selection);
-      var top = customMap.layers().length();
-      customMap.layers().set(top, layer);
-    }, 
-    placeholder:'Confusion Map'
-  });
-  var hideLayerButton2 = hideTopLayerButton('matrix',customMap);
-  var combination2 = ui.Panel({
-    widgets:[selectMatrix, hideLayerButton2],
-    layout: ui.Panel.Layout.Flow('horizontal'),
-    style: {backgroundColor: 'a8dadc',margin:'0px 0px'}
-  });
+  //混淆矩阵标题
+  var confusionTitle = title('Confusion Matrix');
+  //混淆矩阵选择框
+  var selectMatrix = selector(matrixImages, customMap, 'Confusion Map', '120px');
+  //隐藏最上层的混淆矩阵图层
+  var closeMatrix = hideTopLayerButton('Matrix',customMap);
+  //混淆矩阵结果、隐藏按钮并排
+  var combination2 = juxtaposition(selectMatrix, closeMatrix);
   
-  var susTitle = ui.Label({
-    value: 'Select ROC/AUC/Indexs Of SUS',
-    style: {backgroundColor :'a8dadc', fontWeight: 'bold',textAlign:'center',margin:'0px 0px'}
-  });
+  //易发性评价指标
+  var susTitle = title('Fitting Performance');
   var susPanel = SUS_ROC_AUC_Index(LS_Tables,customMap);
   
-  var scvTitle = ui.Label({
-    value: 'Select ROC/AUC/Indexs Of SCV',
-    style: {backgroundColor :'a8dadc', fontWeight: 'bold', textAlign:'center',margin:'0px 0px'}
-  });
+  //空间交叉验证
+  var scvTitle = title('Spatial Predictive Performance');
   var scvPanel = SCV_ROC_AUC_Index(scvTable, columns, grids, serial, customMap);
   
+  //将上述所有部件组合到一个面板
   var selectPanel = ui.Panel({
     widgets: [LStitle, combination1, confusionTitle, combination2, susTitle, susPanel,
               scvTitle, scvPanel],
-    style: {position: 'top-left', backgroundColor :'a8dadc'}
+    style: {position: 'top-left', backgroundColor :'a8dadc', width: '240px'}
   });
+  //添加到地图
   customMap.add(selectPanel);
 }
 
-// show area prediction/result evaluation, hazard prediction
-exports.RightMapSelector = function(LA_Images, LA_Tables, areaSCVTables, LA_columns, grids, serial, Hazard_Images, customMap){
+// 滑坡规模预测、评价、空间交叉验证
+exports.LAMapSelector = function(LA_Images, LA_Tables, areaSCVTables, LA_columns, grids, serial, customMap){
+  //滑坡规模标题
+  var areaTitle = title('Landslide Area Modeling');
+  //规模预测选择框
+  var selectArea = selector(LA_Images, customMap, 'Area Map Prediction', '135px');
+  //隐藏最上层的规模结果
+  var closeLA = hideTopLayerButton('LA',customMap);
+  //并排规模预测和隐藏按钮
+  var combination1 = juxtaposition(selectArea, closeLA);
   
-  var areaTitle =  ui.Label({
-    value: 'Select Area Map Of Prediction',
-    style: {backgroundColor :'a8dadc', fontWeight: 'bold', textAlign:'center'}
-  });
-  
-  var selectArea = ui.Select({
-    items: Object.keys(LA_Images), 
-    onChange: function(selection) {
-      var layer = ui.Map.Layer(LA_Images[selection],null,selection);
-      var top = customMap.layers().length();
-      customMap.layers().set(top, layer);
-    }, 
-    placeholder:'Area Map Of Prediction'
-  });
-  
-  var hideLayerButton1 = hideTopLayerButton('LA',customMap);
-  
-  var combination1 = ui.Panel({
-    widgets:[selectArea, hideLayerButton1],
-    layout: ui.Panel.Layout.Flow('horizontal'),
-    style: {backgroundColor: 'a8dadc'}
-  });
-  
-  var assessmentTitle = ui.Label({
-    value: 'Select Assessment Of Area Map',
-    style: {backgroundColor :'a8dadc', fontWeight: 'bold', textAlign:'center'}
-  });
-  
+  //规模预测评价指标
+  var assessmentTitle = title('Fitting Performance');
   var assessAreaPanel = area_evaluate(LA_Tables,customMap);
+  
+  //空间交叉验证
+  var areaSCVTitle = title('Spatial Predictive Performance');
   var areaSCV = area_scv(areaSCVTables, LA_columns,grids,serial,customMap);
   
-  var combination2 = ui.Panel({
-    widgets:[assessAreaPanel, areaSCV],
-    layout: ui.Panel.Layout.Flow('horizontal'),
-    style: {backgroundColor: 'a8dadc'}
-  });
-  
-  var hazardTitle = ui.Label({
-    value: 'Select Hazard Map Of Prediction',
-    style: {backgroundColor :'a8dadc', fontWeight: 'bold', textAlign:'center'}
-  });
-  
-  var hazardSelect = ui.Select({
-    items: Object.keys(Hazard_Images), 
-    onChange: function(selection) {
-      var layer = ui.Map.Layer(Hazard_Images[selection],null,selection);
-      var top = customMap.layers().length();
-      customMap.layers().set(top, layer);
-    }, 
-    placeholder:'Hazard Map Of Prediction'
-  });
-  
-  var hideLayerButton2 = hideTopLayerButton('Hazard',customMap);
-  
-  var combination3 = ui.Panel({
-    widgets:[hazardSelect, hideLayerButton2],
-    layout: ui.Panel.Layout.Flow('horizontal'),
-    style: {backgroundColor: 'a8dadc'}
-  });
-  
+  //将上述所有部件组合到一个面板
   var selectPanel = ui.Panel({
-    widgets: [areaTitle, combination1, assessmentTitle, combination2, hazardTitle, combination3],
-    style: {position: 'top-right', backgroundColor :'a8dadc'}
+    widgets: [areaTitle, combination1, assessmentTitle, assessAreaPanel, areaSCVTitle, areaSCV],
+    style: {position: 'top-right', backgroundColor :'a8dadc', width: '250px'}
   });
-
+  //添加到地图
   customMap.add(selectPanel);
 }
 
-// Create susceptibility and confusion matrix legend
-exports.LegendLeft = function(LSvisParams, customMap) {
-  var legend = ui.Panel({ style: {width: '200px', position: 'bottom-left'}});
+// 滑坡危险性评价
+exports.HazardSelector = function(Hazard_Images, customMap) {
+  //危险性标题
+  var hazardTitle = title('Landslid Hazard Modeling');
+  //危险性选择框
+  var hazardSelect = selector(Hazard_Images, customMap, 'Hazard Map Prediction', '135px');
+  //隐藏最上层的危险性结果
+  var closeHazard = hideTopLayerButton('Hazard',customMap);
+  //并排危险性和隐藏按钮
+  var combination =juxtaposition(hazardSelect, closeHazard);
   
-  var LS_title =  ui.Label({
-    value:'Susceptibility Legend',
-    style: {fontWeight: 'bold', fontSize: '15px', margin: '0px 15px 5px 15px'}
+  //将上述所有部件组合到一个面板
+  var selectPanel = ui.Panel({
+    widgets: [hazardTitle, combination],
+    style: {position: 'top-right', backgroundColor :'a8dadc', width: '250px'}
   });
+  //添加到地图
+  customMap.add(selectPanel);  
+}
 
+// 易发性、混淆矩阵图例
+exports.LegendLeft = function(LSvisParams, customMap) {
+  //图例面板
+  var legend = ui.Panel({ style: {width: '200px', position: 'bottom-left'}});
+  //易发性图例
+  var LS_title = title('Landslide Susceptibility', 'ffffff', '0px 15px 0px 15px')
+  //生成渐变色条
   var lon = ee.Image.pixelLonLat().select('longitude');
   var gradient = lon.multiply(1/100.0);
   var legendImage = gradient.visualize(LSvisParams);
-
   var colorBar = ui.Thumbnail({
     image: legendImage,
     params: {bbox:'0,0,100,10', dimensions:'180x10'},
     style: {margin:'0px 10px'}
   });
-
+  //图例最小、最大值
   var txtPanel = ui.Panel({
     widgets: [ui.Label('0'), ui.Label({style: {stretch: 'horizontal'}}),ui.Label('1')],
     layout: ui.Panel.Layout.flow('horizontal'),
     style: {stretch: 'horizontal', maxWidth:'200px',height:'25px'}
   });
-
-  var matrixTilte = ui.Label({
-    value:'Confusion Legend', 
-    style: {fontWeight: 'bold', fontSize: '15px', margin: '10px 20px 10px 20px'}
-  });
-
+  
+  //混淆矩阵图例
+  var matrixTilte = title('Confusion Matrix', 'ffffff', '10px 10px 10px 30px');
   var makeRowa = function(color, name) {
       var colorBox = ui.Label({style: {backgroundColor: '#' + color,padding: '10px', margin: '0 0 4px 0' }});
       // Create a label with the description text.
-      var description = ui.Label({value: name,style: {margin: '0 10px 4px 6px'}});
+      var description = ui.Label({value: name,style: {margin: '0 10px 0px 6px'}});
      // Return the panel
       return ui.Panel({widgets: [colorBox, description],layout: ui.Panel.Layout.Flow('horizontal')});
   };
@@ -247,20 +229,18 @@ exports.LegendLeft = function(LSvisParams, customMap) {
     widgets:[matrixPanel1, matrixPanel2], 
     layout: ui.Panel.Layout.Flow('vertical')
   });
-  
+  //合并到面板
   legend.add(LS_title).add(txtPanel).add(colorBar).add(matrixTilte).add(matrixPanel);
   customMap.add(legend);
 }
 
-// Generate Area and Hazard Legends
+// 规模(面积)、危险性图例
 exports.LegendRight = function(areaParams, haParams, customMap){
+  //图例面板
   var legend = ui.Panel({style:{width:'200px', position:'bottom-right'}});
-  
-  var LA_title = ui.Label({
-    value:'Area Legend',
-    style:{fontWeight:'bold', fontSize:'15px', margin:'0px 42px 0px 42px'}
-  });
-  
+  //滑坡规模(面积)图例
+  var LA_title = title('Landslide Area', 'ffffff', '0px 42px 0px 42px');
+  //生成渐变色条
   var lon = ee.Image.pixelLonLat().select('longitude');
   var gradient = lon.multiply(1/100.0);
   var legendImage = gradient.visualize(areaParams);
@@ -269,18 +249,16 @@ exports.LegendRight = function(areaParams, haParams, customMap){
     params: {bbox:'0,0,100,10', dimensions:'180x10'},
     style: {margin:'0px 10px'}
   });
-  
+  //图例最小、最大值
   var txtPanel = ui.Panel({
     widgets: [ui.Label('0'), ui.Label({style: {stretch: 'horizontal'}}),ui.Label('419183(m²)')],
     layout: ui.Panel.Layout.flow('horizontal'),
     style: {stretch: 'horizontal', maxWidth:'200px',height:'25px'}
   });
-    
-  var Hazard_title = ui.Label({
-    value:'Hazard Legend',
-    style:{fontWeight:'bold', fontSize:'15px', margin:'10px 37px 0px 37px'}
-  }); 
   
+  //滑坡危险性图例
+  var Hazard_title = title('Landslide Hazard', 'ffffff', '10px 37px 0px 37px');
+  //生成渐变色条
   var lon2 = ee.Image.pixelLonLat().select('longitude');
   var gradient2 = lon2.multiply(1/100.0);
   var legendImage2 = gradient2.visualize(haParams);
@@ -289,18 +267,18 @@ exports.LegendRight = function(areaParams, haParams, customMap){
     params: {bbox:'0,0,100,10', dimensions:'180x10'},
     style: {margin:'0px 10px'}
   });
-  
+  //图例最小、最大值
   var txtPanel2 = ui.Panel({
     widgets: [ui.Label('0'), ui.Label({style: {stretch: 'horizontal'}}),ui.Label('1')],
     layout: ui.Panel.Layout.flow('horizontal'),
     style: {stretch: 'horizontal', maxWidth:'200px',height:'25px'}
   });
-  
+  //合并到面板
   legend.add(LA_title).add(txtPanel).add(colorBar).add(Hazard_title).add(txtPanel2).add(colorBar2);
   customMap.add(legend);
 }
 
-// Acquire Precision, Accuracy, Recall, F1 Score, ROC curve and AUC value
+// 易发性评价指标：Precision, Accuracy, Recall, F1 Score, ROC curve and AUC value
 var SUS_ROC_AUC_Index = function(LS_Tables,customMap){
   var select = ui.Select({
     items: Object.keys(LS_Tables),
@@ -309,9 +287,7 @@ var SUS_ROC_AUC_Index = function(LS_Tables,customMap){
       var Confusionmatrix = Evaluation.Confusionmatrix('LS', LS_Tables[choice], 'label', roc['ROC_best']);
       var indexs = Evaluation.Indexs(Confusionmatrix);
       
-      var Panel = ui.Panel({style: {width: '280px',position: 'top-center',height:'215px',
-          margin: '0 930px 0 0'  
-      }});
+      var Panel = ui.Panel({style: {width: '240px',position: 'top-left',height:'280px'}});
       
       var AUC = ee.Number(roc['AUC']).format('%.4f');
       AUC = ee.Number.parse(AUC);
@@ -329,15 +305,10 @@ var SUS_ROC_AUC_Index = function(LS_Tables,customMap){
       var chart = ui.Chart.array.values({array: value, axis: 0, xLabels: key})
                 .setChartType('ColumnChart')
                 .setOptions({
-                  title: 'Evaluation Of SUS',
+                  title: 'Evaluation of SUS',
                   colors: ['8ecae6'],
                   legend: {position: 'none'},
                   style:{fontSize: 20, bold: true},
-                  hAxis: {
-                    title: 'Evaluation Index',
-                    textStyle: {italic: false, bold: false, fontSize: 10},
-                    titleTextStyle: {italic: false, bold: true, fontSize: 10}
-                  },
                   vAxis: {
                     title: 'Value',
                     titleTextStyle: {italic: false, bold: true, fontSize: 10},
@@ -389,7 +360,7 @@ var SUS_ROC_AUC_Index = function(LS_Tables,customMap){
   return select;
 }
 
-// Calculate ROC, AUC, Accuracy, Percision, Recall, F1_sorce for spatial cross validation
+// 易发性空间交叉验证评价指标：ROC, AUC, Accuracy, Percision, Recall, F1_sorce
 var SCV_ROC_AUC_Index = function(table, columns, grids, serial, customMap){
   
   var select = ui.Select({
@@ -408,12 +379,12 @@ var SCV_ROC_AUC_Index = function(table, columns, grids, serial, customMap){
       var ichart = ui.Chart.array.values({array: ivalue, axis:0, xLabels:ikeys})
                     .setChartType('PieChart')
                     .setOptions({
-                      title: 'The Importance Of Factors',
+                      title: 'The Importance of Factors',
                       legend: {position:'right'},
                       is3D: true,
                     });
       
-      var Panel = ui.Panel({style: {width: '280px',position: 'bottom-left',height:'215px'}});
+      var Panel = ui.Panel({style: {width: '240px',position: 'top-left',height:'280px'}});
       
       var AUC = ee.Number(roc['AUC']).format('%.4f');
       AUC = ee.Number.parse(AUC);
@@ -431,19 +402,14 @@ var SCV_ROC_AUC_Index = function(table, columns, grids, serial, customMap){
       var chart = ui.Chart.array.values({array: value, axis: 0, xLabels: key})
                 .setChartType('ColumnChart')
                 .setOptions({
-                  title: 'Evaluation Of SCV',
+                  title: 'Evaluation of SCV',
                   colors: ['8ecae6'],
                   legend: {position: 'none'},
                   style:{fontSize: 20, bold: true},
-                  hAxis: {
-                    title: 'Evaluation Index',
-                    textStyle: {italic: false, bold: false, fontSize: 10},
-                    titleTextStyle: {italic: false, bold: true, fontSize: 10}
-                  },
                   vAxis: {
                     title: 'Value',
                     titleTextStyle: {italic: false, bold: true, fontSize: 10},
-                    viewWindow: {min: 0, max: 1.0},
+                    viewWindow: {min: 0, max: 1.0}
                   }
                 });
       
@@ -463,13 +429,14 @@ var SCV_ROC_AUC_Index = function(table, columns, grids, serial, customMap){
       Panel.add(chart).add(rocPanel).add(ichart).add(hideButton);
       customMap.add(Panel);
     },
-    placeholder:'Block Of SCV'
+    placeholder:'Zone of SCV',
+    style: {width: '120px'}
   });
   
   return select;
 }
 
-// Generate animation
+// 动画加载
 exports.animation = function(collection, prefix, yearList, propertyName, customMap){
   var visparam = {
     bands: ['vis-red','vis-green','vis-blue']
@@ -494,7 +461,7 @@ exports.animation = function(collection, prefix, yearList, propertyName, customM
   })
 }
 
-// Remove layers of select
+// 去除最顶层图层
 var hideTopLayerButton = function(prefix,customMap){
   
   var button = ui.Button({
@@ -504,7 +471,7 @@ var hideTopLayerButton = function(prefix,customMap){
       var top = layers.length()-1;
       var layer = layers.get(top);
       var layer_name = layer.getName();
-      var name = layer_name.split('_')[0];
+      var name = layer_name.split(' ')[0];
       if(name == prefix){
         customMap.remove(layer);
         return;
@@ -514,31 +481,31 @@ var hideTopLayerButton = function(prefix,customMap){
   return button;
 }
 
-// Evaluate area prediction results
+// 规模预测评价指标
 var area_evaluate = function(LA_Tables,customMap){
   var select = ui.Select({
     items: Object.keys(LA_Tables),
     onChange:function panel(choice){
-    // Get array of observation and prediction values 
-    var obse = ee.Array(LA_Tables[choice].aggregate_array('ls_area'));
-    var pred = ee.Array(LA_Tables[choice].aggregate_array('LA'));
-    // Compute residuals
-    var resi = obse.subtract(pred);
-    // Compute RMSE and MAE
-    var rmse = resi.pow(2).reduce('mean', [0]).sqrt().get([0]);
-    var mae = resi.abs().reduce('mean', [0]).get([0]);
-    // Compute correlation
-    var correlation = LA_Tables[choice].reduceColumns({
+      // Get array of observation and prediction values 
+      var obse = ee.Array(LA_Tables[choice].aggregate_array('ls_area'));
+      var pred = ee.Array(LA_Tables[choice].aggregate_array('LA'));
+      // Compute residuals
+      var resi = obse.subtract(pred);
+      // Compute RMSE and MAE
+      var rmse = resi.pow(2).reduce('mean', [0]).sqrt().get([0]);
+      var mae = resi.abs().reduce('mean', [0]).get([0]);
+      // Compute correlation
+      var correlation = LA_Tables[choice].reduceColumns({
           reducer: ee.Reducer.spearmansCorrelation(),
           selectors: ['ls_area','LA']
         }).get('correlation');
         
-    var key = ee.List(['RMSE', 'MAE', 'Correlation']);
-    var value = ee.Array([rmse, mae, correlation]);
-    var chart = ui.Chart.array.values({array: value, axis:0, xLabels:key})
+      var key = ee.List(['RMSE', 'MAE', 'Correlation']);
+      var value = ee.Array([rmse, mae, correlation]);
+      var chart = ui.Chart.array.values({array: value, axis:0, xLabels:key})
                   .setChartType('Table');
-    var Panel = ui.Panel({style: {width: '220px',position: 'top-right',height:'150px'}});
-    var hideButton = ui.Button({
+      var Panel = ui.Panel({style: {width: '250px', height:'200px', position: 'top-right'}});
+      var hideButton = ui.Button({
           style:{position: 'bottom-center',stretch:'horizontal'},
           label: 'Close',
           onClick: function(){
@@ -548,15 +515,17 @@ var area_evaluate = function(LA_Tables,customMap){
             return;
           }
         });
-    Panel.add(chart).add(hideButton);
-    customMap.add(Panel);
-    },
-    placeholder:'Assessment Of Area Map'
+      var t = title('Fitting Performance', 'ffffff');
+      Panel.add(t).add(chart).add(hideButton);
+      customMap.add(Panel);
+      },
+      placeholder:'Area Map Prediction',
+      style: {width: '135px'}
   });
   return select;
 }
 
-// Spatial cross-validation of predicted area results
+// 规模预测空间交叉验证评价指标
 var area_scv = function(tables, LA_columns,grids,serial,customMap){
   var select = ui.Select({
     items: Object.keys(serial),
@@ -569,7 +538,7 @@ var area_scv = function(tables, LA_columns,grids,serial,customMap){
     var ichart = ui.Chart.array.values({array: ivalue, axis:0, xLabels:ikeys})
               .setChartType('PieChart')
               .setOptions({
-                title: 'The Importance Of Factors',
+                title: 'The Importance of Factors',
                 legend: {position:'right'},
                 is3D: true,
               });
@@ -591,7 +560,8 @@ var area_scv = function(tables, LA_columns,grids,serial,customMap){
     var value = ee.Array([rmse, mae, correlation]);
     var chart = ui.Chart.array.values({array: value, axis:0, xLabels:key})
                   .setChartType('Table');
-    var Panel = ui.Panel({style: {width: '250px',position: 'top-right',height:'150px'}});
+                  
+    var Panel = ui.Panel({style: {width: '250px', height:'200px', position: 'top-right'}});
     var hideButton = ui.Button({
           style:{position: 'bottom-center',stretch:'horizontal'},
           label: 'Close',
@@ -602,15 +572,18 @@ var area_scv = function(tables, LA_columns,grids,serial,customMap){
             return;
           }
         });
-    Panel.add(chart).add(ichart).add(hideButton);
+        
+    var t = title('Spatial Prediction Preformance', 'ffffff');
+    Panel.add(t).add(chart).add(ichart).add(hideButton);
     customMap.add(Panel);
     },
-    placeholder:'Block Of SCV'
+    placeholder:'Zone of SCV',
+    style: {width: '135px'}
   });
   return select;
 }
 
-// Statistics of annual proportions of different hazard categories
+// 每年滑坡危险性等级占比统计
 exports.hazardChange = function(hazardclass, customMap){
   var xPropValDict = {
     'area2004':2004,
@@ -668,28 +641,32 @@ exports.hazardChange = function(hazardclass, customMap){
                       32: {visibleInLegend: false}, 33: {visibleInLegend: false}, 34: {visibleInLegend: false}
                     }
                   });
+  // chart.style().set({width:'400px', height:'300px'});
+                  
   var Panel = ui.Panel({
-    widgets: [chart],style: {width: '300px',position: 'top-center',height:'220px', margin: '0 0 0 760px'}});  
+    widgets: [chart],style: {position: 'top-center', width:'350px', height:'220px', margin: '0 0 0 1610px'}
+  });  
     
   Panel.style().set({shown:false});
   
   var checkBox = ui.Checkbox({
-    label: 'Hazard Statistics', 
+    label: 'Landslide Hazard Map Statistics', 
     onChange: function(check){
       Panel.style().set({
         shown:check
       });
     },
     style: {
-      position:'bottom-right',
-      backgroundColor :'a8dadc'
+      position:'top-right',
+      backgroundColor :'a8dadc',
+      width: '250px'
     }});
     
   customMap.add(checkBox);
   customMap.add(Panel);
 }
 
-// Generate correlation table between factors
+// 滑坡因子相关性
 exports.correlation = function(table, columns, customMap){
 
   var correlationMatrix = ee.Array(columns.map(function (col1) {
@@ -704,24 +681,26 @@ exports.correlation = function(table, columns, customMap){
   }));
 
   var chart = ui.Chart.array.values({array: correlationMatrix, axis:0, xLabels: columns})
-                  .setChartType('Table')
+                  .setChartType('Table');
+  chart.style().set({width: '400px', height: '315px'});
   
   var Panel = ui.Panel({
-      widgets: [chart], style: {position: 'bottom-right', width:'300px'}
+      widgets: [chart], style: {position: 'top-center', width:'400px', height: '315px', margin: '0 1650px 0 0'}
     });
     
   Panel.style().set({shown:false});
   
   var checkBox = ui.Checkbox({
-    label: 'Factor Correlation', 
+    label: 'Landslide Factor Correlation', 
     onChange: function(check){
       Panel.style().set({
         shown:check
       });
     },
     style: {
-      position:'bottom-right',
-      backgroundColor :'a8dadc'
+      position:'top-left',
+      backgroundColor :'a8dadc',
+      width: '240px'
     }});
   
   customMap.add(checkBox);
