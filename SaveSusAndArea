@@ -1,4 +1,4 @@
-var SUS = require('users/liuhj946/susceptibility:SUS');
+var SUS = require('users/liuhj946/susceptibility:LS');
 var LA = require('users/liuhj946/susceptibility:LA');
 
 var LS_columns = ['Slo_mean','Slo_std','Ele_mean','Ele_std','Asp_mean','Asp_std','Nss_mean',
