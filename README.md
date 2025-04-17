@@ -9,7 +9,8 @@ The user only needs to enter the mapping units of the area to be evaluated, e.g.
 Display Tool
 ===
 ![image](https://github.com/user-attachments/assets/8293fd3e-43ea-4245-83be-b60cbd66287f)
-![image](https://github.com/user-attachments/assets/1bdba176-08c2-4a4d-831a-584f9719c3a1)
+![image](https://github.com/user-attachments/assets/7cb47322-7825-4a55-b02b-7313a83282a3)
+![image](https://github.com/user-attachments/assets/2b3e5c47-7065-4ada-86aa-48774231d308)
 ![image](https://github.com/user-attachments/assets/7d3e4854-4acf-461d-b507-0d17c66bc8c8)
 ![image](https://github.com/user-attachments/assets/db7210ac-c909-4922-abb4-34af8a9f3814)
 ![image](https://github.com/user-attachments/assets/fae051b3-8d00-47d5-a549-79a15edd8fe8)
