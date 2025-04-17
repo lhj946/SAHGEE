@@ -1,31 +1,73 @@
 exports.Topographic = function(table,scale){
   // 导入计算地形因素的方程TAGEE
-  var TAGEE = require('users/joselucassafanelli/TAGEE:TAGEE-functions');
+  var TAGEE = require('users/zecojls/TAGEE:TAGEE-functions');
   var pkgs = require('users/liuhj946/susceptibility:0pkgs');
   // 获取研究区及外边框
   var gridcoll = ee.FeatureCollection(table);
   var bbox=table.geometry().bounds();
   // 导入DEM数据,哥白尼全球30m
   var demdataset = ee.ImageCollection("COPERNICUS/DEM/GLO30").filterBounds(bbox).select('DEM');
-  // 合成DEM为一张影像
+  // 拼接DEM为一张影像
   var demImage = demdataset.mosaic();
   //===============================================
-  // 计算地形因子：高程、坡度、坡面、北向、东向、平面曲率、剖面曲率
+  // 计算地形因子：高程、坡度、北向、东向、平面曲率、剖面曲率
   var DEMAttributes = TAGEE.terrainAnalysis(TAGEE, demImage, bbox);
   var Elevation = DEMAttributes.select('Elevation');
   var Slope = DEMAttributes.select('Slope');
-  var Aspect = DEMAttributes.select('Aspect');
+  // var Aspect = DEMAttributes.select('Aspect');
   var Northness = DEMAttributes.select('Northness');
   var Eastness = DEMAttributes.select('Eastness');
   var HorizontalCurvature = DEMAttributes.select('HorizontalCurvature');
   var VerticalCurvature = DEMAttributes.select('VerticalCurvature');
+  // 加载 MERIT Hydro 数据集并获取流积累数据
+  var flowAcc = ee.Image('MERIT/Hydro/v1_0_1').select('upa').clip(bbox);
+  //计算 SPI 和 TWI
+  // var SPI = flowAcc.multiply(Slope.tan());
+  var epsilon = 0.001; // 用于防止 tan(β) 为 0 的情况
+  var TWI = flowAcc.divide(Slope.tan().add(epsilon)).log();
+  // 矢量粗糙度、地形起伏度、地形粗糙指数
+  var vrm = ee.ImageCollection("projects/sat-io/open-datasets/Geomorpho90m/vrm");
+  var roughness = ee.ImageCollection("projects/sat-io/open-datasets/Geomorpho90m/roughness");
+  var tri = ee.ImageCollection("projects/sat-io/open-datasets/Geomorpho90m/tri");
   // 统计区域内各地形属性的均值与标准差
   gridcoll = pkgs.iter_mean_std('Slo', Slope, gridcoll, scale);
   gridcoll = pkgs.iter_mean_std('Ele', Elevation, gridcoll, scale);
-  gridcoll = pkgs.iter_mean_std('Asp', Aspect, gridcoll, scale);
+  // gridcoll = pkgs.iter_mean_std('Asp', Aspect, gridcoll, scale);
   gridcoll = pkgs.iter_mean_std('Nss', Northness, gridcoll, scale);
   gridcoll = pkgs.iter_mean_std('Ess', Eastness, gridcoll, scale);
   gridcoll = pkgs.iter_mean_std('HCv', HorizontalCurvature, gridcoll, scale);
   gridcoll = pkgs.iter_mean_std('VCv', VerticalCurvature, gridcoll, scale);
+  gridcoll = pkgs.iter_mean_std('Twi', TWI, gridcoll, scale);
+  gridcoll = pkgs.iter_mean_std('Vrm', TWI, gridcoll, scale);
+  gridcoll = pkgs.iter_mean_std('Rou', TWI, gridcoll, scale);
+  gridcoll = pkgs.iter_mean_std('Tri', TWI, gridcoll, scale);
   return gridcoll;
 }
+
+
+// 导出地形因素
+// var TAGEE = require('users/zecojls/TAGEE:TAGEE-functions');
+// var bbox=gp.geometry().bounds();
+// var demdataset = ee.ImageCollection("COPERNICUS/DEM/GLO30").filterBounds(bbox).select('DEM');
+// var list = ['Elevation','Slope','Aspect','Northness','Eastness','planCurvature','profileCurvature'];
+// var demImage = demdataset.mosaic();
+// var DEMAttributes = TAGEE.terrainAnalysis(TAGEE, demImage, bbox);
+// var Elevation = DEMAttributes.select('Elevation').clip(gp);
+// var Slope = DEMAttributes.select('Slope').clip(gp);
+// var Aspect = DEMAttributes.select('Aspect').clip(gp);
+// var Northness = DEMAttributes.select('Northness').clip(gp);
+// var Eastness = DEMAttributes.select('Eastness').clip(gp);
+// var HorizontalCurvature = DEMAttributes.select('HorizontalCurvature').clip(gp);
+// var VerticalCurvature = DEMAttributes.select('VerticalCurvature').clip(gp);
+// var list2 = [Elevation,Slope,Aspect,Northness,Eastness,HorizontalCurvature,VerticalCurvature];
+// for(var i=0;i<7;i++){
+//   Export.image.toDrive({
+// 		image:list2[i],
+// 	  description:list[i],
+// 	  region:gp.geometry().bounds(),
+// 	  scale:30,
+// 	  crs:'EPSG:32651',
+// 	  floder:'DEM_Attributes',
+// 	  maxPixels:1e13
+// })
+// }
