@@ -1,0 +1,40 @@
+var data = ee.FeatureCollection("projects/ee-liuhj946/assets/GPX0410");
+var SUS = function(col, year, LS_columns){
+  // 计算易发性，计算概率存为属性'LS'
+  var LS = function(year){
+    var traindata = col.filter(ee.Filter.neq('year',year));
+    var testdata = col.filter(ee.Filter.eq('year',year));
+    var classifier = ee.Classifier.smileRandomForest(200).train({
+        features: traindata,
+        classProperty: 'label',
+        inputProperties: LS_columns
+      });
+    var rf_classifier = classifier.setOutputMode('PROBABILITY');
+    var suscFit = testdata.classify(rf_classifier,'LS').select(['id','LS','year','label','area']);
+    return suscFit;
+  };
+  return LS(year);
+}
+
+var LS_columns = ['Slo_mean','Slo_std','Ele_mean','Ele_std','Nss_mean','Nss_std','Ess_mean','Ess_std',
+                  'HCv_mean','HCv_std','VCv_mean','VCv_std','rain_mean','ndvi_mean','ndvi_std','year_norm'];
+
+// 04-10滑坡易发性
+var ls2004 = SUS(data, 1, LS_columns);
+var ls2005 = SUS(data, 2, LS_columns);
+var ls2006 = SUS(data, 3, LS_columns);
+var ls2007 = SUS(data, 4, LS_columns);
+var ls2008 = SUS(data, 5, LS_columns);
+var ls2009 = SUS(data, 6, LS_columns);
+var ls2010 = SUS(data, 7, LS_columns);
+
+var lslist = [ls2004,ls2005,ls2006,ls2007,ls2008,ls2009,ls2010];
+var lsName = ['LS_2004', 'LS_2005','LS_2006','LS_2007','LS_2008','LS_2009','LS_2010'];
+
+for (var i =0; i<lslist.length; i++){
+  Export.table.toAsset({
+		collection: lslist[i],
+    description: lsName[i],
+    assetId:'projects/ee-liuhj946/assets/LS/'+lsName[i]
+  })
+}
