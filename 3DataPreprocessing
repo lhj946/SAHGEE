@@ -1,0 +1,87 @@
+var pkgs = require('users/liuhj946/susceptibility:0pkgs');
+var EF = require('users/liuhj946/susceptibility:2ExtractedFactors');
+
+var table1 = ee.FeatureCollection("projects/ee-liuhj946/assets/label_of_landslide/gp_su_ls2004"),
+    table2 = ee.FeatureCollection("projects/ee-liuhj946/assets/label_of_landslide/gp_su_ls2005"),
+    table3 = ee.FeatureCollection("projects/ee-liuhj946/assets/label_of_landslide/gp_su_ls2006"),
+    table4 = ee.FeatureCollection("projects/ee-liuhj946/assets/label_of_landslide/gp_su_ls2007"),
+    table5 = ee.FeatureCollection("projects/ee-liuhj946/assets/label_of_landslide/gp_su_ls2008"),
+    table6 = ee.FeatureCollection("projects/ee-liuhj946/assets/label_of_landslide/gp_su_ls2009"),
+    table7 = ee.FeatureCollection("projects/ee-liuhj946/assets/label_of_landslide/gp_su_ls2010");
+
+var scale = 30;
+
+var ls_2004 = EF.extracted_factors(table1,scale,2004,8,1,2005,7,31);
+var ls_2005 = EF.extracted_factors(table2,scale,2005,8,1,2006,7,31);
+var ls_2006 = EF.extracted_factors(table3,scale,2006,8,1,2007,7,31);
+var ls_2007 = EF.extracted_factors(table4,scale,2007,8,1,2008,7,31);
+var ls_2008 = EF.extracted_factors(table5,scale,2008,8,1,2009,7,31);
+var ls_2009 = EF.extracted_factors(table6,scale,2009,8,1,2010,7,31);
+var ls_2010 = EF.extracted_factors(table7,scale,2010,8,1,2011,7,31);
+
+var coll = ee.FeatureCollection([ls_2004,ls_2005,ls_2006,ls_2007,ls_2008,ls_2009,ls_2010]).flatten();
+
+var data = pkgs.standardization(coll, 'Ele_std', 'Ele_std');
+    data = pkgs.standardization(data, 'Ele_mean', 'Ele_mean');
+    data = pkgs.standardization(data, 'Slo_std', 'Slo_std');
+    data = pkgs.standardization(data, 'Slo_mean', 'Slo_mean');
+    data = pkgs.standardization(data, 'Nss_std', 'Nss_std');
+    data = pkgs.standardization(data, 'Nss_mean', 'Nss_mean');
+    data = pkgs.standardization(data, 'Ess_std', 'Ess_std');
+    data = pkgs.standardization(data, 'Ess_mean', 'Ess_mean');
+    data = pkgs.standardization(data, 'HCv_std', 'HCv_std');
+    data = pkgs.standardization(data, 'HCv_mean', 'HCv_mean');
+    data = pkgs.standardization(data, 'VCv_std', 'VCv_std');
+    data = pkgs.standardization(data, 'VCv_mean', 'VCv_mean');
+    data = pkgs.standardization(data, 'ndvi_std', 'ndvi_std');
+    data = pkgs.standardization(data, 'ndvi_mean', 'ndvi_mean');
+    data = pkgs.standardization(data, 'rain_mean', 'rain_mean');
+    data = pkgs.standardization(data, 'PA', 'PA');
+    data = pkgs.standardization(data, 'PSA', 'PSA');
+    data = pkgs.standardization(data, 'DA', 'DA');
+    data = pkgs.standardization(data, 'DSA', 'DSA');
+    data = pkgs.standardization(data, 'A', 'A');
+    data = pkgs.standardization(data, 'D', 'D');
+    data = pkgs.standardization(data, 'P', 'P');
+    data = pkgs.standardization(data, 'Twi_mean', 'Twi_mean');
+    data = pkgs.standardization(data, 'Twi_std', 'Twi_std');
+    data = pkgs.standardization(data, 'Vrm_mean', 'Vrm_mean');
+    data = pkgs.standardization(data, 'Vrm_std', 'Vrm_std');
+    data = pkgs.standardization(data, 'Rou_mean', 'Rou_mean');
+    data = pkgs.standardization(data, 'Rou_std', 'Rou_std');
+    data = pkgs.standardization(data, 'Tri_mean', 'Tri_mean');
+    data = pkgs.standardization(data, 'Tri_std', 'Tri_std');
+    data = pkgs.standardization(data, 'year', 'year_norm');
+
+// 输出原始csv
+// Export.table.toDrive({
+// 		collection:coll,
+// 	  description:'Taiwan0410_original',
+// 	  fileFormat:'CSV',
+// 	  selectors:['id','label','year','area','ls_area','Ele_std','Ele_mean','Slo_std','Slo_mean',
+// 	  'Nss_std','Nss_mean','Ess_std','Ess_mean','HCv_std','HCv_mean','VCv_std','VCv_mean','ndvi_std','ndvi_mean',
+// 	  'rain_mean','PA','PSA','DA','DSA','D','P','A','Twi_mean','Twi_std','year_nrom']
+// })
+
+// 输出标准化csv
+// Export.table.toDrive({
+// 		collection:data,
+// 	  description:'Taiwan0410_standard',
+// 	  fileFormat:'CSV',
+// 	  priority:0,
+// 	  selectors:['id','label','year','area','ls_area','Ele_std','Ele_mean','Slo_std','Slo_mean',
+// 	  'Nss_std','Nss_mean','Ess_std','Ess_mean','HCv_std','HCv_mean','VCv_std','VCv_mean','ndvi_std','ndvi_mean',
+// 	  'rain_mean','PA','PSA','DA','DSA','D','P','A','Twi_mean','Twi_std','year_nrom']
+// })
+
+// 输出FeatureCollection到云资产
+var shp = data.select(['id','label','year','area','ls_area','Ele_std','Ele_mean','Slo_std','Slo_mean',
+	  'Nss_std','Nss_mean','Ess_std','Ess_mean','HCv_std','HCv_mean','VCv_std','VCv_mean','ndvi_std','ndvi_mean',
+	  'rain_mean','PA','PSA','DA','DSA','D','P','A','Twi_mean','Twi_std','Vrm_mean','Vrm_std','Rou_mean',
+    'Rou_std','Tri_mean','Tri_std','year_norm']);    
+Export.table.toAsset({
+		collection:shp,
+	  description:'GPX04_10',
+	  assetId:'GPX04_10'
+})
+
