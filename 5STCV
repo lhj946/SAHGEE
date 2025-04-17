@@ -1,0 +1,111 @@
+var table = ee.FeatureCollection("projects/ee-liuhj946/assets/GPX0410");
+
+// 定义一个随机森林训练器
+var RF_classifier = function(collection,columns,label,tree){
+  return ee.Classifier.smileRandomForest(tree).train({
+    features: collection,
+    classProperty: label,
+    inputProperties: columns
+  });
+};
+
+var sus_stcv = function(table,columns,label,fid,grids,i,year){
+  // 根据每个几何要素生成中心点，生成的中心点包含几何要素所有属性
+  var center =  table.map(function(feature) {
+        return feature.centroid(0.01,table.geometry().projection());
+  });
+  // 将格网转为list
+  var covList = grids.toList(grids.size());
+  // 获取测试方格
+  var cell_test = ee.Feature(covList.get(i));
+  // 根据id选择当前方格为测试集，其余为训练集
+  var cell_train = grids.filter(ee.Filter.neq("system:index", cell_test.get('system:index')));
+  // 选择训练集方格范围里的中心点，转为list，筛选id在list中的几何要素
+  var train_center = center.filterBounds(cell_train.geometry());
+  var list_train = train_center.reduceColumns(ee.Reducer.toList(), [fid]).get('list');
+  var SU_train = table.filter(ee.Filter.inList(fid, list_train));
+  // 选择测试集方格范围里的中心点，转为list，筛选id在list中的几何要素
+  var test_center = center.filterBounds(cell_test.geometry());
+  var list_test = test_center.reduceColumns(ee.Reducer.toList(), [fid]).get('list');
+  var SU_test = table.filter(ee.Filter.inList(fid, list_test));
+  // 再在方格测试集里选择筛选年份作为最终测试集
+  var test = SU_test.filter(ee.Filter.eq('year', year));
+  // 合并方格训练集和方格测试集中的训练年份为最终训练集
+  var SU_test_year = SU_test.filter(ee.Filter.neq('year', year));
+  var train = SU_train.merge(SU_test_year);
+  // 将训练集带入随机森林模型训练，并应用训练器得到测试集的结果
+  var classifier = RF_classifier(train,columns,label,200).setOutputMode('PROBABILITY');
+  var explain = classifier.explain();
+  var sus = test.classify(classifier,'LS');
+  var suscell = sus.select([fid,'LS',label,'year']);
+  //返回测试集结果与方格
+  return {'stcv':suscell, 'explain':explain};
+}
+
+var area_stcv = function(tables, LA_columns, label, fid, grids, i, year){
+  tables = tables.filter(ee.Filter.gt(label, 0))
+  // 将对数值替换到规模标签
+  var log = function(feature){
+    var value = feature.get(label);
+    var logValue = ee.Number(value).log();
+    return feature.set(label, logValue); 
+  }
+  tables = tables.map(log);
+  // 根据每个几何要素生成中心点，生成的中心点包含几何要素所有属性
+  var center =  tables.map(function(feature) {
+        return feature.centroid(0.01,tables.geometry().projection());
+  });
+  // 将格网转为list
+  var covList = grids.toList(grids.size());
+  // 获取测试方格
+  var cell_test = ee.Feature(covList.get(i));
+  // 根据id选择当前方格为测试集，其余为训练集
+  var cell_train = grids.filter(ee.Filter.neq("system:index", cell_test.get('system:index')));
+  // 选择训练集方格范围里的中心点，转为list，筛选id在list中的几何要素
+  var train_center = center.filterBounds(cell_train.geometry());
+  var list_train = train_center.reduceColumns(ee.Reducer.toList(), [fid]).get('list');
+  var SU_train = tables.filter(ee.Filter.inList(fid, list_train));
+  // 选择测试集方格范围里的中心点，转为list，筛选id在list中的几何要素
+  var test_center = center.filterBounds(cell_test.geometry());
+  var list_test = test_center.reduceColumns(ee.Reducer.toList(), [fid]).get('list');
+  var SU_test = tables.filter(ee.Filter.inList(fid, list_test));
+  // 再在方格测试集里选择筛选测试年份作为最终测试集
+  var test = SU_test.filter(ee.Filter.eq('year', year));
+  // 合并方格训练集和方格测试集中的训练年份为最终训练集
+  var SU_test_year = SU_test.filter(ee.Filter.neq('year', year));
+  var train = SU_train.merge(SU_test_year);
+  // 将训练集带入随机森林模型训练，并应用训练器得到测试集的结果
+  var classifier = RF_classifier(train,LA_columns,label,300).setOutputMode('REGRESSION');
+  var explain = classifier.explain();
+  var area = test.classify(classifier,'LA');
+  var areacell = area.select([fid,'LA',label,'year']);
+  return {'stcv':areacell, 'explain':explain};
+}
+
+// var pkgs = require('users/liuhj946/susceptibility:0pkgs');
+// var Evaluation = require('users/liuhj946/susceptibility:5Evaluation');
+
+// var LS_columns = ['Slo_mean','Slo_std','Ele_mean','Ele_std','Nss_mean','Nss_std','Ess_mean','Ess_std',
+//                   'HCv_mean','HCv_std','VCv_mean','VCv_std','rain_mean','ndvi_mean','ndvi_std','year_norm'];
+// var LA_columns = ['Ele_std','Ele_mean','Slo_std','Slo_mean','Nss_std','Nss_mean','Ess_std','Ess_mean',
+//                   'HCv_std','HCv_mean','VCv_std','VCv_mean','ndvi_std','ndvi_mean','rain_mean',
+//                   'PA','PSA','DA','DSA','D','P','A','Twi_mean','Twi_std','Vrm_mean','Vrm_std',
+//                   'Rou_mean','Rou_std','Tri_mean','Tri_std','year_norm'];
+// var grids = pkgs.generateGrid(table, 2, 2);
+// var i = 3;
+// var stcv_res1 = area_stcv(table, LA_columns, 'ls_area', 'id', grids, i, 1)['stcv'];
+// var stcv_res2 = area_stcv(table, LA_columns, 'ls_area', 'id', grids, i, 2)['stcv'];
+// var stcv_res3 = area_stcv(table, LA_columns, 'ls_area', 'id', grids, i, 3)['stcv'];
+// var stcv_res4 = area_stcv(table, LA_columns, 'ls_area', 'id', grids, i, 4)['stcv'];
+// var stcv_res5 = area_stcv(table, LA_columns, 'ls_area', 'id', grids, i, 5)['stcv'];
+// var stcv_res6 = area_stcv(table, LA_columns, 'ls_area', 'id', grids, i, 6)['stcv'];
+// var stcv_res7 = area_stcv(table, LA_columns, 'ls_area', 'id', grids, i, 7)['stcv'];
+
+// var stcv_res = ee.FeatureCollection([stcv_res1,stcv_res2,stcv_res3,stcv_res4,stcv_res5,stcv_res6,
+//                                     stcv_res7]).flatten();
+  
+// Export.table.toAsset({
+//   collection: stcv_res,
+//   description:'stcv_area' + i,
+//   assetId:'STCV/stcv_area' + i
+// })
