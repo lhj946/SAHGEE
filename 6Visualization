@@ -1,5 +1,6 @@
-var Evaluation = require('users/liuhj946/susceptibility:7Evaluation');
-var SCV = require('users/liuhj946/susceptibility:6SCV');
+var Evaluation = require('users/liuhj946/susceptibility:5Evaluation');
+var SCV = require('users/liuhj946/susceptibility:5SCV');
+var STCV = require('users/liuhj946/susceptibility:5STCV');
 var pkgs = require('users/liuhj946/susceptibility:0pkgs');
 var animation = require('users/gena/packages:animation')
 
@@ -8,10 +9,10 @@ var animation = require('users/gena/packages:animation')
 exports.tfpnVis = function(LS_table){
   var roc = Evaluation.ROC('LS', LS_table, 'label');
   var visStyles = ee.Dictionary({
-    tp:{color:'ef476f'},
-    fn:{color:'ffd166'},
-    tn:{color:'06d6a0'},
-    fp:{color:'118ab2'},
+    tp:{color:'E3EFCB'},
+    fn:{color:'E14669'},
+    tn:{color:'298BCC'},
+    fp:{color:'F6CB68'},
   });
   var Confusionmatrix = Evaluation.Confusionmatrix('LS', LS_table, 'label', roc['ROC_best']);
   var matrix = Confusionmatrix['matrix'];
@@ -24,7 +25,7 @@ exports.tfpnVis = function(LS_table){
   return visImage;
 }
 
-// 分位数法可视化（5类）
+// 分类可视化（5类）
 exports.tableVis = function(table, column, classList, typeColors){
   var data = table.map(function(feature){
     var value = feature.getNumber(column);
@@ -41,6 +42,50 @@ exports.tableVis = function(table, column, classList, typeColors){
             condition: value.lte(classList.get(3)),
             trueCase: 4,
             falseCase: 5
+          })
+        })
+      })
+    });
+    return feature.set('type', type);
+  });
+  data = data.map(function(feature) {
+    return feature.set('style', typeColors.get(feature.get('type')));
+  });
+  var visImage = data.style({
+    styleProperty: 'style'
+  });
+  return visImage;
+}
+
+// 分类可视化（8类）
+exports.areaTableVis = function(table, column, classList, typeColors){
+  var data = table.map(function(feature){
+    var value = feature.getNumber(column);
+    var type = ee.Algorithms.If({
+      condition: value.lte(classList.get(0)),
+      trueCase: 1,
+      falseCase: ee.Algorithms.If({
+        condition: value.lte(classList.get(1)),
+        trueCase: 2,
+        falseCase: ee.Algorithms.If({
+          condition: value.lte(classList.get(2)),
+          trueCase: 3,
+          falseCase: ee.Algorithms.If({
+            condition: value.lte(classList.get(3)),
+            trueCase: 4,
+            falseCase: ee.Algorithms.If({
+              condition: value.lte(classList.get(4)),
+              trueCase: 5,
+              falseCase: ee.Algorithms.If({
+                condition: value.lte(classList.get(5)),
+                trueCase: 6,
+                falseCase: ee.Algorithms.If({
+                  condition: value.lte(classList.get(6)),
+                  trueCase: 7,
+                  falseCase: 8
+                })
+              })
+            })
           })
         })
       })
@@ -87,7 +132,7 @@ var title = function(name, color, mag){
   mag = mag || '0px 0px';
   var t = ui.Label({
     value: name,
-    style: {backgroundColor : color, fontWeight: 'bold', margin: mag, fontSize: '20px'}
+    style: {backgroundColor : color, fontWeight: 'bold', margin: mag, fontSize: '15px'}
   });
   return t;
 }
@@ -112,7 +157,7 @@ exports.correlation = function(table, columns, customMap){
   chart.style().set({width: '400px', height: '315px'});
   
   var Panel = ui.Panel({
-      widgets: [chart], style: {position: 'top-center', width:'435px', height: '345px', margin: '0 31% 0 0'}
+      widgets: [chart], style: {position: 'top-center', width:'435px', height: '345px', margin: '0 34% 0 0'}
     });
     
   Panel.style().set({shown:false});
@@ -137,8 +182,93 @@ exports.correlation = function(table, columns, customMap){
 }
 
 //=================================================================================================================
+// 每年滑坡易发性等级占比统计
+exports.susChange = function(susClass, customMap){
+  var xPropValDict = {
+    'area2004':2004,
+    'area2005':2005,
+    'area2006':2006,
+    'area2007':2007,
+    'area2008':2008,
+    'area2009':2009,
+    'area2010':2010
+  };
+  var xPropLabels = [
+    {f:'2004',v:2004},
+    {f:'2005',v:2005},
+    {f:'2006',v:2006},
+    {f:'2007',v:2007},
+    {f:'2008',v:2008},
+    {f:'2009',v:2009},
+    {f:'2010',v:2010}
+  ];  
+
+  var chart = ui.Chart.feature
+                  .byProperty({
+                    features: susClass,
+                    xProperties: xPropValDict,
+                    seriesProperty: 'class'
+                  })
+                  .setSeriesNames([
+                    'very low', 'low', 'medium', 'high', 'very high'
+                    ])
+                  .setChartType('BarChart')
+                  .setOptions({
+                    title: 'Proportion of Susceptibility Classes',
+                    hAxis: {
+                      title: 'Area Percentage',
+                      titleTextStyle: {italic: false, bold: true},
+                      gridlines: {count: 0}
+                    },
+                    vAxis: {
+                      title: 'year',
+                      titleTextStyle: {italic: false, bold: true},
+                      ticks: xPropLabels
+                    },
+                    colors: ['2e7d32', '66bb6a', 'fff176', 'ffa726', 'e53935'],
+                    isStacked: 'percent',
+                    series: {
+                      5: {visibleInLegend: false}, 6: {visibleInLegend: false}, 7: {visibleInLegend: false}, 
+                      8: {visibleInLegend: false}, 9: {visibleInLegend: false}, 10: {visibleInLegend: false}, 
+                      11: {visibleInLegend: false}, 12: {visibleInLegend: false}, 13: {visibleInLegend: false}, 
+                      14: {visibleInLegend: false}, 15: {visibleInLegend: false}, 16: {visibleInLegend: false}, 
+                      17: {visibleInLegend: false}, 18: {visibleInLegend: false}, 19: {visibleInLegend: false}, 
+                      20: {visibleInLegend: false}, 21: {visibleInLegend: false}, 22: {visibleInLegend: false}, 
+                      23: {visibleInLegend: false}, 24: {visibleInLegend: false}, 25: {visibleInLegend: false}, 
+                      26: {visibleInLegend: false}, 27: {visibleInLegend: false}, 28: {visibleInLegend: false}, 
+                      29: {visibleInLegend: false}, 30: {visibleInLegend: false}, 31: {visibleInLegend: false}, 
+                      32: {visibleInLegend: false}, 33: {visibleInLegend: false}, 34: {visibleInLegend: false}
+                    }
+                  });
+  chart.style().set({width:'370px', height:'260px'});
+                  
+  var Panel = ui.Panel({
+    widgets: [chart],style: {position: 'top-center', width:'400px', height:'300px', margin: '0 35% 0 0'}
+  });  
+    
+  Panel.style().set({shown:false});
+  
+  var checkBox = ui.Checkbox({
+    label: 'Susceptibility Statistics', 
+    onChange: function(check){
+      Panel.style().set({
+        shown:check
+      });
+    },
+    style: {
+      position:'top-left',
+      backgroundColor :'a8dadc',
+      width: '330px',
+      fontSize: '20px'
+    }});
+    
+  customMap.add(checkBox);
+  customMap.add(Panel);
+}
+
+//=================================================================================================================
 // 易发性、混淆矩阵、易发性评价、空间交叉验证评价
-exports.LSSelector = function(LS_Images, matrixImages, LS_Tables, scvTable,
+exports.LSSelector = function(LS_Images, matrixImages, LS_Tables, data, Tables,
                                     columns, grids, serial, customMap) {
   //易发性标题
   var LStitle = title('Landslide Susceptibility Modeling');
@@ -164,12 +294,16 @@ exports.LSSelector = function(LS_Images, matrixImages, LS_Tables, scvTable,
   
   //空间交叉验证
   var scvTitle = title('Spatial Predictive Performance');
-  var scvPanel = SCV_ROC_AUC_Index(scvTable, columns, grids, serial, customMap);
+  var scvPanel = SCV_ROC_AUC_Index(data, columns, grids, serial, customMap);
+  
+  //时空交叉验证
+  var stcvTitle = title('Spatio-temporal Predictive Performance');
+  var stcvPanel = STCV_ROC_AUC_Index(Tables, columns, grids, serial, customMap);
   
   //将上述所有部件组合到一个面板
   var selectPanel = ui.Panel({
     widgets: [LStitle, combination1, confusionTitle, combination2, susTitle, susPanel,
-              scvTitle, scvPanel],
+              scvTitle, scvPanel, stcvTitle, stcvPanel],
     style: {position: 'top-left', backgroundColor :'a8dadc', width: '330px'}
   });
   //添加到地图
@@ -186,7 +320,7 @@ var SUS_ROC_AUC_Index = function(LS_Tables,customMap){
       var Confusionmatrix = Evaluation.Confusionmatrix('LS', LS_Tables[choice], 'label', roc['ROC_best']);
       var indexs = Evaluation.Indexs(Confusionmatrix);
       
-      var Panel = ui.Panel({style: {width: '300px',position: 'top-center',height:'300px', margin:'0% 41% 0% 0%'}});
+      var Panel = ui.Panel({style: {width: '300px',position: 'top-center',height:'510px', margin:'0% 42% 0% 0%'}});
       
       var AUC = ee.Number(roc['AUC']).format('%.4f');
       AUC = ee.Number.parse(AUC);
@@ -204,14 +338,14 @@ var SUS_ROC_AUC_Index = function(LS_Tables,customMap){
       var chart = ui.Chart.array.values({array: value, axis: 0, xLabels: key})
                 .setChartType('ColumnChart')
                 .setOptions({
-                  title: 'Evaluation of SUS',
+                  title: 'Assessment of SUS',
                   colors: ['8ecae6'],
                   legend: {position: 'none'},
                   style:{fontSize: 20, bold: true},
                   vAxis: {
                     title: 'Value',
                     titleTextStyle: {italic: false, bold: true, fontSize: 10},
-                    viewWindow: {min: 0.5, max: 1},
+                    viewWindow: {min: 0, max: 1},
                   }
                 });
       
@@ -284,7 +418,7 @@ var SCV_ROC_AUC_Index = function(table, columns, grids, serial, customMap){
                       is3D: true,
                     });
       
-      var Panel = ui.Panel({style: {width: '300px',position: 'top-center',height:'300px', margin:'0% 41% 0% 0%'}});
+      var Panel = ui.Panel({style: {width: '300px',position: 'top-center',height:'510px', margin:'0% 42% 0% 0%'}});
       
       var AUC = ee.Number(roc['AUC']).format('%.4f');
       AUC = ee.Number.parse(AUC);
@@ -302,7 +436,7 @@ var SCV_ROC_AUC_Index = function(table, columns, grids, serial, customMap){
       var chart = ui.Chart.array.values({array: value, axis: 0, xLabels: key})
                 .setChartType('ColumnChart')
                 .setOptions({
-                  title: 'Evaluation of SCV',
+                  title: 'Assessment of SCV',
                   colors: ['8ecae6'],
                   legend: {position: 'none'},
                   style:{fontSize: 20, bold: true},
@@ -336,12 +470,89 @@ var SCV_ROC_AUC_Index = function(table, columns, grids, serial, customMap){
 }
 
 //=================================================================================================================
+// 易发性时空交叉验证评价指标：ROC, AUC, Accuracy, Percision, Recall, F1_sorce
+var STCV_ROC_AUC_Index = function(tables, columns, grids, serial, customMap){
+  
+  var select = ui.Select({
+    items: Object.keys(serial),
+    onChange:function panel(choice){
+      
+      var stcv_res = tables[choice];
+      
+      var roc = Evaluation.ROC('LS', stcv_res, 'label');
+      // var roc = Evaluation.ROC('LS', data[choice], 'label')
+      var Confusionmatrix = Evaluation.Confusionmatrix('LS', stcv_res, 'label', roc['ROC_best']);
+      var indexs = Evaluation.Indexs(Confusionmatrix);
+      // var explain = scv_res['explain'];
+      // var importance = ee.Dictionary(explain.get('importance'));
+      // var ikeys = importance.keys();
+      // var ivalue = importance.values();
+      // var ichart = ui.Chart.array.values({array: ivalue, axis:0, xLabels:ikeys})
+      //               .setChartType('PieChart')
+      //               .setOptions({
+      //                 title: '因子重要性',
+      //                 legend: {position:'right'},
+      //                 is3D: true,
+      //               });
+      
+      var Panel = ui.Panel({style: {width: '300px',position: 'top-center', height:'510px', margin:'0% 42% 0% 0%'}});
+      
+      var AUC = ee.Number(roc['AUC']).format('%.4f');
+      AUC = ee.Number.parse(AUC);
+      var Accuracy = ee.Number(indexs['accuracy']).format('%.4f');
+      Accuracy = ee.Number.parse(Accuracy);
+      var Precision = ee.Number(indexs['precision']).format('%.4f');
+      Precision = ee.Number.parse(Precision);
+      var Recall = ee.Number(indexs['recall']).format('%.4f');
+      Recall = ee.Number.parse(Recall);
+      var F1_score = ee.Number(indexs['F1_score']).format('%.4f');
+      F1_score = ee.Number.parse(F1_score);
+      
+      var key = ee.List(['AUC', 'Accuracy', 'Precision', 'Recall', 'F1']);
+      var value = ee.Array([AUC, Accuracy, Precision, Recall, F1_score]);
+      var chart = ui.Chart.array.values({array: value, axis: 0, xLabels: key})
+                .setChartType('ColumnChart')
+                .setOptions({
+                  title: 'Assessment of STCV',
+                  colors: ['8ecae6'],
+                  legend: {position: 'none'},
+                  style:{fontSize: 20, bold: true},
+                  vAxis: {
+                    title: 'Value',
+                    titleTextStyle: {italic: false, bold: true, fontSize: 10},
+                    viewWindow: {min: 0, max: 1.0}
+                  }
+                });
+      
+      var rocPanel = ui.Panel(roc['chartROC']);
+      
+      var hideButton = ui.Button({
+        style:{position: 'bottom-center',stretch:'horizontal'},
+        label: 'Close',
+        onClick: function(){
+          Panel.style().set({
+            shown: false
+          });
+          return;
+        }
+      });
+      var t = title('Spatio-temporal Prediction Preformance', 'ffffff');
+      Panel.add(t).add(chart).add(rocPanel).add(hideButton);
+      customMap.add(Panel);
+    },
+    placeholder:'Zone of STCV',
+    style: {width: '200px', margin:'2% 0% 2% 1%'}
+  });
+  return select;
+}
+
+//=================================================================================================================
 // 易发性、混淆矩阵图例
 exports.LegendLeft = function(LSvisParams, customMap) {
   //图例面板
   var legend = ui.Panel({ style: {width: '250px', position: 'bottom-left'}});
   //易发性图例
-  var LS_title = title('Landslide Susceptibility', 'ffffff', '0% 0% 0% 3%')
+  var LS_title = title('Landslide Susceptibility', 'ffffff', '0% 0% 0% 15%')
   //生成渐变色条
   var lon = ee.Image.pixelLonLat().select('longitude');
   var gradient = lon.multiply(1/100.0);
@@ -353,13 +564,17 @@ exports.LegendLeft = function(LSvisParams, customMap) {
   });
   //图例最小、最大值
   var txtPanel = ui.Panel({
-    widgets: [ui.Label('0'), ui.Label({style: {stretch: 'horizontal'}}),ui.Label('1')],
+    widgets: [ui.Label({value:'VL', style: {stretch: 'horizontal'}}),
+    ui.Label({value:'L', style: {stretch: 'horizontal'}}),
+    ui.Label({value:'M', style: {stretch: 'horizontal'}}),
+    ui.Label({value:'H', style: {stretch: 'horizontal'}}),
+    ui.Label({value:'VH', style: {stretch: 'horizontal'}})],
     layout: ui.Panel.Layout.flow('horizontal'),
     style: {stretch: 'horizontal', maxWidth:'250px',height:'25px'}
   });
   
   //混淆矩阵图例
-  var matrixTilte = title('Confusion Matrix', 'ffffff', '3% 0 0 12%');
+  var matrixTilte = title('Confusion Matrix', 'ffffff', '3% 0 0 22%');
   var makeRowa = function(color, name) {
     //生成矩形填充框
     var colorBox = ui.Label({style: {backgroundColor: '#' + color, padding: '15px', margin: '0 0 4px 0' }});
@@ -369,17 +584,17 @@ exports.LegendLeft = function(LSvisParams, customMap) {
     return ui.Panel({widgets: [colorBox, description],layout: ui.Panel.Layout.Flow('horizontal')});
   };
   
-  var matrixPalette = ['ef476f','ffd166','118ab2','06d6a0'];
+  var matrixPalette = ['E3EFCB','E14669','F6CB68','298BCC'];
   var matrixName = ['TP','FN','FP','TN'];
   
   var matrixPanel1 = ui.Panel({
     widgets:[makeRowa(matrixPalette[0],matrixName[0]), makeRowa(matrixPalette[1],matrixName[1])],
-    style:{margin: '10px 20px 0px 35px'},
+    style:{margin: '10px 20px 0px 40px'},
     layout: ui.Panel.Layout.Flow('horizontal')
   });
   var matrixPanel2 = ui.Panel({
     widgets:[makeRowa(matrixPalette[2],matrixName[2]), makeRowa(matrixPalette[3],matrixName[3])],
-    style:{margin: '10px 20px 0px 35px'},
+    style:{margin: '10px 20px 0px 40px'},
     layout: ui.Panel.Layout.Flow('horizontal')
   });
   
@@ -452,10 +667,10 @@ exports.hazardChange = function(hazardclass, customMap){
                       32: {visibleInLegend: false}, 33: {visibleInLegend: false}, 34: {visibleInLegend: false}
                     }
                   });
-  // chart.style().set({width:'400px', height:'300px'});
+  chart.style().set({width:'370px', height:'260px'});
                   
   var Panel = ui.Panel({
-    widgets: [chart],style: {position: 'top-center', width:'350px', height:'220px', margin: '0 0 0 38%'}
+    widgets: [chart],style: {position: 'top-center', width:'400px', height:'300px', margin: '0 0 0 36%'}
   });  
     
   Panel.style().set({shown:false});
@@ -480,7 +695,7 @@ exports.hazardChange = function(hazardclass, customMap){
 
 //=================================================================================================================
 // 滑坡规模预测、评价、空间交叉验证
-exports.LAMapSelector = function(LA_Images, LA_Tables, areaSCVTables, LA_columns, grids, serial, customMap){
+exports.LAMapSelector = function(LA_Images, LA_Tables, data, Tables, LA_columns, grids, serial, customMap){
   //滑坡规模标题
   var areaTitle = title('Landslide Area Modeling');
   //规模预测选择框
@@ -496,11 +711,15 @@ exports.LAMapSelector = function(LA_Images, LA_Tables, areaSCVTables, LA_columns
   
   //空间交叉验证
   var areaSCVTitle = title('Spatial Predictive Performance');
-  var areaSCV = area_scv(areaSCVTables, LA_columns,grids,serial,customMap);
+  var areaSCV = area_scv(data, LA_columns,grids,serial,customMap);
+  
+  //时空交叉验证
+  var areaSTCVTitle = title('Spatio-temporal Prediction Preformance');
+  var areaSTCV = area_stcv(Tables, LA_columns, grids, serial, customMap);
   
   //将上述所有部件组合到一个面板
   var selectPanel = ui.Panel({
-    widgets: [areaTitle, combination1, assessmentTitle, assessAreaPanel, areaSCVTitle, areaSCV],
+    widgets: [areaTitle, combination1, assessmentTitle, assessAreaPanel, areaSCVTitle, areaSCV, areaSTCVTitle, areaSTCV],
     style: {position: 'top-right', backgroundColor :'a8dadc', width: '330px'}
   });
   //添加到地图
@@ -513,25 +732,67 @@ var area_evaluate = function(LA_Tables,customMap){
   var select = ui.Select({
     items: Object.keys(LA_Tables),
     onChange:function panel(choice){
-      // Get array of observation and prediction values 
-      var obse = ee.Array(LA_Tables[choice].aggregate_array('ls_area'));
-      var pred = ee.Array(LA_Tables[choice].aggregate_array('LA'));
+      // Get array of observation and prediction values  
+      var data = LA_Tables[choice].filter(ee.Filter.gt('ls_area', 0));
+      var obse = ee.Array(data.aggregate_array('ls_area'));
+      var pred = ee.Array(data.aggregate_array('LA'));
+      // Scatter Plot
+      var scatterChart = ui.Chart.array.values({array: pred, axis:0, xLabels: obse})
+                .setChartType('ScatterChart')
+                .setOptions({
+                  title: 'Scatter Plot',
+                  colors: ['8ecae6'],
+                  legend: {position: 'none'},
+                  pointSize: 3,
+                  hAxis: {
+                    title: 'Observed Value [In(m²)]',
+                    // textStyle: {italic: false, bold: false, fontSize: 10},
+                    titleTextStyle: {italic: false, bold: true, fontSize: 10},
+                    viewWindow: {min: 4, max: 15}
+                  },
+                  vAxis: {
+                    title: 'Predicted Value [In(m²)]',
+                    titleTextStyle: {italic: false, bold: true, fontSize: 10},
+                    viewWindow: {min: 4, max: 15}
+                  },
+                  dataOpacity: 0.6,
+                  // trendlines: {
+                  //   0: {  // add a trend line to the 1st series
+                  //     type: 'linear',  // or 'polynomial', 'exponential'
+                  //     color: 'red',
+                  //     lineWidth: 2,
+                  //     opacity: 0.2,
+                  //     // showR2: true,
+                  //     visibleInLegend: true,
+                  //   }
+                  // }
+                });
       // Compute residuals
       var resi = obse.subtract(pred);
       // Compute RMSE and MAE
       var rmse = resi.pow(2).reduce('mean', [0]).sqrt().get([0]);
       var mae = resi.abs().reduce('mean', [0]).get([0]);
       // Compute correlation
-      var correlation = LA_Tables[choice].reduceColumns({
-          reducer: ee.Reducer.spearmansCorrelation(),
+      var correlation = data.reduceColumns({
+          reducer: ee.Reducer.pearsonsCorrelation(),
           selectors: ['ls_area','LA']
         }).get('correlation');
         
       var key = ee.List(['RMSE', 'MAE', 'Correlation']);
       var value = ee.Array([rmse, mae, correlation]);
       var chart = ui.Chart.array.values({array: value, axis:0, xLabels:key})
-                  .setChartType('Table');
-      var Panel = ui.Panel({style: {width: '250px', height:'200px', position: 'top-center', margin: '0% 0% 0% 43%'}});
+                  .setChartType('ColumnChart')
+                  .setOptions({
+                    title: 'Assessment of LA',
+                    colors: ['8ecae6'],
+                    legend: {position: 'none'},
+                    style:{fontSize: 20, bold: true},
+                    vAxis:{
+                      title:'Value',
+                      titleTextStyle: {italic: false, bold: true, fontSize: 10}
+                    }
+                  });
+      var Panel = ui.Panel({style: {width: '300px', height:'500px', position: 'top-center', margin: '0% 0% 0% 42%'}});
       var hideButton = ui.Button({
           style:{position: 'bottom-center',stretch:'horizontal'},
           label: 'Close',
@@ -543,10 +804,10 @@ var area_evaluate = function(LA_Tables,customMap){
           }
         });
       var t = title('Fitting Performance', 'ffffff');
-      Panel.add(t).add(chart).add(hideButton);
+      Panel.add(t).add(scatterChart).add(chart).add(hideButton);
       customMap.add(Panel);
       },
-      placeholder:'Area Map Prediction',
+      placeholder:'Area Prediction Map',
       style: {width: '200px'}
   });
   return select;
@@ -560,6 +821,30 @@ var area_scv = function(tables, LA_columns,grids,serial,customMap){
     onChange:function panel(choice){
     var areaTables = SCV.area_scv(tables, LA_columns, 'ls_area', 'id', grids, serial[choice])['scv'];
     var explain = SCV.area_scv(tables, LA_columns, 'ls_area', 'id', grids, serial[choice])['explain'];
+    // Get array of observation and prediction values 
+    var obse = ee.Array(areaTables.aggregate_array('ls_area'));
+    var pred = ee.Array(areaTables.aggregate_array('LA'));
+    // 散点图
+    var scatterChart = ui.Chart.array.values({array: pred, axis:0, xLabels: obse})
+              .setChartType('ScatterChart')
+              .setOptions({
+                title: 'Scatter Plot',
+                colors: ['8ecae6'],
+                legend: {position: 'none'},
+                pointSize: 3,
+                hAxis: {
+                  title: 'Observed Value [In(m²)]',
+                  // textStyle: {italic: false, bold: false, fontSize: 10},
+                  titleTextStyle: {italic: false, bold: true, fontSize: 10},
+                  viewWindow: {min: 5, max: 15}
+                },
+                vAxis: {
+                  title: 'Predicted Value [In(m²)]',
+                  titleTextStyle: {italic: false, bold: true, fontSize: 10},
+                  viewWindow: {min: 5, max: 15}
+                },
+                dataOpacity: 0.6,
+              });
     var importance = ee.Dictionary(explain.get('importance'));
     var ikeys = importance.keys();
     var ivalue = importance.values();
@@ -570,9 +855,6 @@ var area_scv = function(tables, LA_columns,grids,serial,customMap){
                 legend: {position:'right'},
                 is3D: true,
               });
-    // Get array of observation and prediction values 
-    var obse = ee.Array(areaTables.aggregate_array('ls_area'));
-    var pred = ee.Array(areaTables.aggregate_array('LA'));
     // Compute residuals
     var resi = obse.subtract(pred);
     // Compute RMSE and MAE
@@ -580,16 +862,26 @@ var area_scv = function(tables, LA_columns,grids,serial,customMap){
     var mae = resi.abs().reduce('mean', [0]).get([0]);
     // Compute correlation
     var correlation = areaTables.reduceColumns({
-          reducer: ee.Reducer.spearmansCorrelation(),
+          reducer: ee.Reducer.pearsonsCorrelation(),
           selectors: ['ls_area','LA']
         }).get('correlation');
         
     var key = ee.List(['RMSE', 'MAE', 'Correlation']);
     var value = ee.Array([rmse, mae, correlation]);
     var chart = ui.Chart.array.values({array: value, axis:0, xLabels:key})
-                  .setChartType('Table');
+                  .setChartType('ColumnChart')
+                    .setOptions({
+                      title: 'Assessment of SCV',
+                      colors: ['8ecae6'],
+                      legend: {position: 'none'},
+                      style:{fontSize: 20, bold: true},
+                      vAxis:{
+                        title:'Value',
+                        titleTextStyle: {italic: false, bold: true, fontSize: 10}
+                      }
+                    });
                   
-    var Panel = ui.Panel({style: {width: '250px', height:'200px', position: 'top-center', margin: '0% 0% 0% 44%'}});
+    var Panel = ui.Panel({style: {width: '300px', height:'500px', position: 'top-center', margin: '0% 0% 0% 42%'}});
     var hideButton = ui.Button({
           style:{position: 'bottom-center',stretch:'horizontal'},
           label: 'Close',
@@ -602,11 +894,91 @@ var area_scv = function(tables, LA_columns,grids,serial,customMap){
         });
         
     var t = title('Spatial Prediction Preformance', 'ffffff');
-    Panel.add(t).add(chart).add(ichart).add(hideButton);
+    Panel.add(t).add(scatterChart).add(chart).add(ichart).add(hideButton);
     customMap.add(Panel);
     },
     placeholder:'Zone of SCV',
     style: {width: '200px'}
+  });
+  return select;
+}
+
+//=================================================================================================================
+// 规模预测时空交叉验证评价指标
+var area_stcv = function(stcvTables, LA_columns, grids, serial, customMap){
+  var select = ui.Select({
+    items: Object.keys(serial),
+    onChange:function panel(choice){
+      var stcvTable = stcvTables[choice];
+      
+      // Get array of observation and prediction values 
+      var obse = ee.Array(stcvTable.aggregate_array('ls_area'));
+      var pred = ee.Array(stcvTable.aggregate_array('LA'));
+      // 散点图
+      var scatterChart = ui.Chart.array.values({array: pred, axis:0, xLabels: obse})
+                .setChartType('ScatterChart')
+                .setOptions({
+                  title: 'Scatter Plot',
+                  colors: ['8ecae6'],
+                  legend: {position: 'none'},
+                  pointSize: 3,
+                  hAxis: {
+                    title: 'Observed Value [In(m²)]',
+                    // textStyle: {italic: false, bold: false, fontSize: 10},
+                    titleTextStyle: {italic: false, bold: true, fontSize: 10},
+                    viewWindow: {min: 5, max: 15}
+                  },
+                  vAxis: {
+                    title: 'Predicted Value [In(m²)]',
+                    titleTextStyle: {italic: false, bold: true, fontSize: 10},
+                    viewWindow: {min: 5, max: 15}
+                  },
+                  dataOpacity: 0.6,
+                });
+      // Compute residuals
+      var resi = obse.subtract(pred);
+      // Compute RMSE and MAE
+      var rmse = resi.pow(2).reduce('mean', [0]).sqrt().get([0]);
+      var mae = resi.abs().reduce('mean', [0]).get([0]);
+      // Compute correlation
+      var correlation = stcvTable.reduceColumns({
+            reducer: ee.Reducer.pearsonsCorrelation(),
+            selectors: ['ls_area','LA']
+          }).get('correlation');
+          
+      var key = ee.List(['RMSE', 'MAE', 'Correlation']);
+      var value = ee.Array([rmse, mae, correlation]);
+      var chart = ui.Chart.array.values({array: value, axis:0, xLabels:key})
+                    .setChartType('ColumnChart')
+                    .setOptions({
+                      title: 'Assessment of STCV',
+                      colors: ['8ecae6'],
+                      legend: {position: 'none'},
+                      style:{fontSize: 20, bold: true},
+                      vAxis:{
+                        title:'Value',
+                        titleTextStyle: {italic: false, bold: true, fontSize: 10}
+                      }
+                    });
+                    
+      var Panel = ui.Panel({style: {width: '300px', height:'500px', position: 'top-center', margin: '0% 0% 0% 42%'}});
+      var hideButton = ui.Button({
+            style:{position: 'bottom-center',stretch:'horizontal'},
+            label: 'Close',
+            onClick: function(){
+              Panel.style().set({
+                shown: false
+              });
+              return;
+            }
+          });
+          
+      var t = title('Spatial-temporal Prediction Preformance', 'ffffff');
+      Panel.add(t).add(scatterChart).add(chart).add(hideButton);
+      customMap.add(Panel);
+      },
+      placeholder:'Zone of STCV',
+      style: {width: '200px'}
   });
   return select;
 }
@@ -638,7 +1010,7 @@ exports.LegendRight = function(areaParams, haParams, customMap){
   //图例面板
   var legend = ui.Panel({style:{width:'250px', position:'bottom-right'}});
   //滑坡规模(面积)图例
-  var LA_title = title('Landslide Area', 'ffffff', '0% 20% 0% 20%');
+  var LA_title = title('Landslide Area [In(m²)]', 'ffffff', '0% 0% 0% 18%');
   //生成渐变色条
   var lon = ee.Image.pixelLonLat().select('longitude');
   var gradient = lon.multiply(1/100.0);
@@ -650,13 +1022,13 @@ exports.LegendRight = function(areaParams, haParams, customMap){
   });
   //图例最小、最大值
   var txtPanel = ui.Panel({
-    widgets: [ui.Label('0'), ui.Label({style: {stretch: 'horizontal'}}),ui.Label('419183(m²)')],
+    widgets: [ui.Label('<8'), ui.Label('8.5'), ui.Label('9'),ui.Label('9.5'),ui.Label('10'),ui.Label('10.5'),ui.Label('>11')],
     layout: ui.Panel.Layout.flow('horizontal'),
-    style: {stretch: 'horizontal', maxWidth:'235px',height:'25px'}
+    style: {stretch: 'horizontal', maxWidth:'250px',height:'30px'}
   });
   
   //滑坡危险性图例
-  var Hazard_title = title('Landslide Hazard', 'ffffff', '3% 0% 0% 17%');
+  var Hazard_title = title('Landslide Hazard', 'ffffff', '3% 0% 0% 25%');
   //生成渐变色条
   var lon2 = ee.Image.pixelLonLat().select('longitude');
   var gradient2 = lon2.multiply(1/100.0);
@@ -668,9 +1040,13 @@ exports.LegendRight = function(areaParams, haParams, customMap){
   });
   //图例最小、最大值
   var txtPanel2 = ui.Panel({
-    widgets: [ui.Label('0'), ui.Label({style: {stretch: 'horizontal'}}),ui.Label('1')],
+    widgets: [ui.Label({value:'VL', style: {stretch: 'horizontal'}}),
+              ui.Label({value:'L', style: {stretch: 'horizontal'}}),
+              ui.Label({value:'M', style: {stretch: 'horizontal'}}),
+              ui.Label({value:'H', style: {stretch: 'horizontal'}}),
+              ui.Label({value:'VH', style: {stretch: 'horizontal'}})],
     layout: ui.Panel.Layout.flow('horizontal'),
-    style: {stretch: 'horizontal', maxWidth:'235px',height:'25px'}
+    style: {stretch: 'horizontal', maxWidth:'250px',height:'30px'}
   });
   //合并到面板
   legend.add(LA_title).add(txtPanel).add(colorBar).add(Hazard_title).add(txtPanel2).add(colorBar2);
