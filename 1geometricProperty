@@ -1,0 +1,39 @@
+exports.geometric  = function(FC){
+  var fc = ee.FeatureCollection(FC);
+  var res = fc.map(function(f){
+    // 获取每个要素的几何
+    var points = f.geometry();
+    // 获取多边形的坐标（顶点列表）
+    var coordinates = ee.List(points.coordinates().get(0)); 
+    // 将坐标转换为点要素列表
+    var vertices = coordinates.map(function(coord) {
+      return ee.Geometry.Point(coord);
+    });
+    // 生成所有顶点对的组合并计算距离
+    var distances = vertices.map(function(v1) {
+      var p1 = ee.Feature(v1);
+      return vertices.map(function(v2) {
+        var p2 = ee.Feature(v2);
+        return p1.distance(p2);
+      });
+    }).flatten(); // 将嵌套列表展平
+    // 计算最大距离
+    var D = ee.Number(distances.reduce(ee.Reducer.max()));
+    // 面积
+    var A = ee.Number(f.area());
+    // 周长
+    var P =  ee.Number(f.perimeter());
+    // 周长面积比
+    var PA = P.divide(A);
+    // 周长根号面积比
+    var PSA = P.divide(A.sqrt());
+    // 直径面积比
+    var DA = D.divide(A);
+    // 直径根号面积比
+    var DSA = D.divide(A.sqrt());
+    
+    return f.set('A', A).set('D', D).set('P', P).set('PA', PA).set('PSA', PSA)
+            .set('DA', DA).set('DSA', DSA);
+  })
+  return res;
+}
