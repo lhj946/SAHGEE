@@ -34,7 +34,7 @@ exports.SCV = function(table,columns,label,fid,grids,i){
     
   } else { 
     // 将训练集带入随机森林模型训练，并应用训练器得到测试集的结果
-    var classifier = RF_classifier(SU_train,columns,label,70).setOutputMode('PROBABILITY');
+    var classifier = RF_classifier(SU_train,columns,label,200).setOutputMode('PROBABILITY');
     var explain = classifier.explain();
     SU_test = ee.FeatureCollection(SU_test);
     var sus = SU_test.classify(classifier,'LS');
@@ -45,6 +45,15 @@ exports.SCV = function(table,columns,label,fid,grids,i){
 }
 
 exports.area_scv = function(tables, LA_columns,label,fid,grids,i){
+  // 选取滑坡面积不为0的数据
+  tables = tables.filter(ee.Filter.gt('ls_area', 0))
+  var log = function(feature){
+    var value = feature.get(label);
+    var logValue = ee.Number(value).log();
+    return feature.set(label, logValue); 
+  }
+  // 将对数值替换到规模标签
+  tables = tables.map(log);
   // 根据每个几何要素生成中心点，生成的中心点包含几何要素所有属性
   var center =  tables.map(function(feature) {
         return feature.centroid(0.01,tables.geometry().projection());
@@ -64,7 +73,7 @@ exports.area_scv = function(tables, LA_columns,label,fid,grids,i){
   var list_test = test_center.reduceColumns(ee.Reducer.toList(), [fid]).get('list');
   var SU_test = tables.filter(ee.Filter.inList(fid, list_test));
   // 将训练集带入随机森林模型训练，并应用训练器得到测试集的结果
-  var classifier = RF_classifier(SU_train,LA_columns,label,120).setOutputMode('REGRESSION');
+  var classifier = RF_classifier(SU_train,LA_columns,label,300).setOutputMode('REGRESSION');
   var explain = classifier.explain();
   SU_test = ee.FeatureCollection(SU_test);
   var area = SU_test.classify(classifier,'LA');
