@@ -11,11 +11,8 @@ Display Tool
 ![image](https://github.com/user-attachments/assets/8293fd3e-43ea-4245-83be-b60cbd66287f)
 ![image](https://github.com/user-attachments/assets/1bdba176-08c2-4a4d-831a-584f9719c3a1)
 ![image](https://github.com/user-attachments/assets/7d3e4854-4acf-461d-b507-0d17c66bc8c8)
-![image](https://github.com/user-attachments/assets/5b142915-e900-41d0-8bb1-0ccf89d78bb6)![image](https://github.com/user-attachments/assets/865f8077-74d2-40a8-bee4-482adc55da8a)![image](https://github.com/user-attachments/assets/f6d14a47-d4b7-41ee-a9d6-7f4656221a05)
 ![image](https://github.com/user-attachments/assets/db7210ac-c909-4922-abb4-34af8a9f3814)
-![image](https://github.com/user-attachments/assets/284a8383-dfaa-49e7-9790-5e18d46c7495)![image](https://github.com/user-attachments/assets/c33fa8e9-612c-46a2-ae5e-3806b76f6198)![image](https://github.com/user-attachments/assets/3231d138-cb69-47c8-91ae-4709429ebafe)
 ![image](https://github.com/user-attachments/assets/fae051b3-8d00-47d5-a549-79a15edd8fe8)
-![image](https://github.com/user-attachments/assets/b80df3ae-7bbe-4127-969b-070c2afae1bb)
 
 
 
