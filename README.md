@@ -9,17 +9,15 @@ The user only needs to enter the mapping units of the area to be evaluated, e.g.
 Display Tool
 ===
 ![image](https://github.com/user-attachments/assets/8293fd3e-43ea-4245-83be-b60cbd66287f)
-![image](https://github.com/user-attachments/assets/35268c76-3fb3-4374-93b4-389f20acf885)
-![image](https://github.com/user-attachments/assets/ee34339f-8691-407b-8f15-d87fe1fd4531)
-![image](https://github.com/user-attachments/assets/0254c88b-f59d-4948-a900-65f25fe9e62f)
-![image](https://github.com/user-attachments/assets/fb53cca3-ea4d-496c-9508-8cf26d1e6747)
-![image](https://github.com/user-attachments/assets/2cba1312-9535-4c80-a365-7777c952d98c)
-![image](https://github.com/user-attachments/assets/d169a01d-ce38-40de-b961-0c6745fbf18a)
-![image](https://github.com/user-attachments/assets/d4a1adac-21c7-4c19-a2ca-a25f797160c0)
-![image](https://github.com/user-attachments/assets/46c2f35d-6189-4927-9fa6-592617550c5e)
-![image](https://github.com/user-attachments/assets/a78ed8f9-99d7-4e3a-a8c9-a5b8aa134d7d)
-![image](https://github.com/user-attachments/assets/bd2636e4-6445-4374-9725-12b59fde37ef)
-![image](https://github.com/user-attachments/assets/a3e55602-e685-4b12-a64a-c46c9113736a)
+![image](https://github.com/user-attachments/assets/1bdba176-08c2-4a4d-831a-584f9719c3a1)
+![image](https://github.com/user-attachments/assets/7d3e4854-4acf-461d-b507-0d17c66bc8c8)
+![image](https://github.com/user-attachments/assets/5b142915-e900-41d0-8bb1-0ccf89d78bb6)![image](https://github.com/user-attachments/assets/865f8077-74d2-40a8-bee4-482adc55da8a)![image](https://github.com/user-attachments/assets/f6d14a47-d4b7-41ee-a9d6-7f4656221a05)
+![image](https://github.com/user-attachments/assets/db7210ac-c909-4922-abb4-34af8a9f3814)
+![image](https://github.com/user-attachments/assets/284a8383-dfaa-49e7-9790-5e18d46c7495)![image](https://github.com/user-attachments/assets/c33fa8e9-612c-46a2-ae5e-3806b76f6198)![image](https://github.com/user-attachments/assets/3231d138-cb69-47c8-91ae-4709429ebafe)
+![image](https://github.com/user-attachments/assets/fae051b3-8d00-47d5-a549-79a15edd8fe8)
+![image](https://github.com/user-attachments/assets/b80df3ae-7bbe-4127-969b-070c2afae1bb)
+
+
 
 Use
 ===
