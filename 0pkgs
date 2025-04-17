@@ -1,7 +1,7 @@
 var pkgs = {};
 
 // 导入计算地形因素的方程TAGEE
-var TAGEE = require('users/joselucassafanelli/TAGEE:TAGEE-functions');
+var TAGEE = require('users/zecojls/TAGEE:TAGEE-functions');
 
 // 计算区域内的影像值的平均值与标准差
 pkgs.mean_std = function(image,collection,scale) {
@@ -15,9 +15,9 @@ pkgs.mean_std = function(image,collection,scale) {
   };
 
 // 在矢量数据中加入具体属性的平均值列与标准差列
-pkgs.iter_mean_std = function(name,layer,collection,scale){
+pkgs.iter_mean_std = function(name,image,collection,scale){
   name = ee.String(name);
-  var gridcoll = pkgs.mean_std(layer,collection,scale);
+  var gridcoll = pkgs.mean_std(image,collection,scale);
   gridcoll = gridcoll.map(function(feature) {
       return feature.set(name.cat('_mean'), feature.get('mean'));
     });
@@ -50,7 +50,7 @@ pkgs.num_str = function(num){
 };  
 
 // 对表中的一列值标准化到0-1
-pkgs.standardization = function(table, column){
+pkgs.standardization = function(table, column, name){
   
   var t = ee.FeatureCollection(table);
 
@@ -59,38 +59,17 @@ pkgs.standardization = function(table, column){
     selectors: [column]
   });
   
-  var min = ee.Number(minMax.get('min'));
-  var max = ee.Number(minMax.get('max'));
-  var diff = max.subtract(min);
+  var min = minMax.get('min');
+  var max = minMax.get('max');
+  var diff = ee.Number(max).subtract(ee.Number(min));
   
   var res = t.map(function(f){
-    var standardvalue = ee.Number(f.get(column)).subtract(min).divide(diff);
-    return f.set(column, standardvalue);
+    var value = f.getNumber(column);
+    var standardvalue = value.subtract(min).divide(diff);
+    return f.set(name, standardvalue);
   });
   return res;
 };
-
-// 对表中所有因子列作标准化
-pkgs.standardData = function(collection){
-    var res = pkgs.standardization(collection,'Ele_std');
-    res = pkgs.standardization(res,'Ele_mean');
-    res = pkgs.standardization(res,'Slo_std');
-    res = pkgs.standardization(res,'Slo_mean');
-    res = pkgs.standardization(res,'Asp_std');
-    res = pkgs.standardization(res,'Asp_mean');
-    res = pkgs.standardization(res,'Nss_std');
-    res = pkgs.standardization(res,'Nss_mean');
-    res = pkgs.standardization(res,'Ess_std');
-    res = pkgs.standardization(res,'Ess_mean');
-    res = pkgs.standardization(res,'HCv_std');
-    res = pkgs.standardization(res,'HCv_mean');
-    res = pkgs.standardization(res,'VCv_std');
-    res = pkgs.standardization(res,'VCv_mean');
-    res = pkgs.standardization(res,'ndvi_std');
-    res = pkgs.standardization(res,'ndvi_mean');
-    res = pkgs.standardization(res,'rain_mean');
-    return res;
-  }
 
 // 生成格网，x、y分别是横坐标、纵坐标个数
 pkgs.generateGrid = function(table, x, y){
@@ -147,20 +126,20 @@ pkgs.quantile = function(table, List, column){
 }
 
 // 统计危险性等级占比
-pkgs.statistics = function(table,year,hazardQuantile){
-  var vlFilter = ee.Filter.lt('hazard', hazardQuantile.get(0));
-  var lFilter = ee.Filter.and(ee.Filter.gte('hazard', hazardQuantile.get(0)),ee.Filter.lt('hazard', hazardQuantile.get(1)));
-  var mFilter = ee.Filter.and(ee.Filter.gte('hazard', hazardQuantile.get(1)),ee.Filter.lt('hazard', hazardQuantile.get(2)));
-  var hFilter = ee.Filter.and(ee.Filter.gte('hazard', hazardQuantile.get(2)),ee.Filter.lt('hazard', hazardQuantile.get(3)));
-  var vhFilter = ee.Filter.gte('hazard', hazardQuantile.get(3));
+pkgs.statistics = function(table,column,area,year,hazardQuantile){
+  var vlFilter = ee.Filter.lt(column, hazardQuantile.get(0));
+  var lFilter = ee.Filter.and(ee.Filter.gte(column, hazardQuantile.get(0)),ee.Filter.lt(column, hazardQuantile.get(1)));
+  var mFilter = ee.Filter.and(ee.Filter.gte(column, hazardQuantile.get(1)),ee.Filter.lt(column, hazardQuantile.get(2)));
+  var hFilter = ee.Filter.and(ee.Filter.gte(column, hazardQuantile.get(2)),ee.Filter.lt(column, hazardQuantile.get(3)));
+  var vhFilter = ee.Filter.gte(column, hazardQuantile.get(3));
   
-  var VL = table.filter(vlFilter).aggregate_sum('area');
-  var L = table.filter(lFilter).aggregate_sum('area');
-  var M = table.filter(mFilter).aggregate_sum('area');
-  var H = table.filter(hFilter).aggregate_sum('area');
-  var VH = table.filter(vhFilter).aggregate_sum('area');
+  var VL = table.filter(vlFilter).aggregate_sum(area);
+  var L = table.filter(lFilter).aggregate_sum(area);
+  var M = table.filter(mFilter).aggregate_sum(area);
+  var H = table.filter(hFilter).aggregate_sum(area);
+  var VH = table.filter(vhFilter).aggregate_sum(area);
   
-  var areastr = ee.String('area').cat(pkgs.num_str(year));
+  var areastr = ee.String(area).cat(pkgs.num_str(year));
   
   var vlf = ee.Feature(null).set('year',year).set(areastr,VL).set('class','very low');
   var lf = ee.Feature(null).set('year',year).set(areastr,L).set('class','low');
@@ -169,6 +148,52 @@ pkgs.statistics = function(table,year,hazardQuantile){
   var vhf = ee.Feature(null).set('year',year).set(areastr,VH).set('class','very high');
 
   return ee.FeatureCollection([vlf,lf,mf,hf,vhf]);
+}
+
+// 利用kmeans算法对数据分类
+pkgs.kmeans = function(col, column, numclass){
+
+  var data = col.aggregate_array(column);
+  
+  // 将列表转换为特征集合
+  var features = data.map(function(value) {
+    return ee.Feature(null, {'value': value});
+  });
+  var fc = ee.FeatureCollection(features);
+  
+  // 应用 k-means 聚类，指定 numclass 个类
+  var k = numclass;
+  var clusterer = ee.Clusterer.wekaKMeans(k).train(fc, ['value']);
+  
+  // 对特征集合进行聚类
+  var clustered = fc.cluster(clusterer);
+  
+  // 计算每个聚类的质心
+  var clusters = ee.List.sequence(0, k-1);
+  var centroids = clusters.map(function(cluster) {
+    var clusterFeatures = clustered.filter(ee.Filter.eq('cluster', cluster));
+    return clusterFeatures.aggregate_mean('value');
+  });
+  
+  // 对质心排序
+  var sortedCentroids = centroids.sort();
+  
+  // 计算相邻质心之间的断点
+  var breakpoints = sortedCentroids.slice(0, -1).zip(sortedCentroids.slice(1)).map(function(pair) {
+    var pair = ee.List(pair);
+    var left = ee.Number(pair.get(0));
+    var right = ee.Number(pair.get(1));
+    return left.add(right).divide(2);
+  });
+  
+  // 添加最小值和最大值以定义完整的类区间
+  // var minVal = fc.aggregate_min('value');
+  // var maxVal = fc.aggregate_max('value');
+  // var allBreaks = ee.List([minVal]).cat(breakpoints).cat([maxVal]);
+  
+  // 输出结果
+  return breakpoints;
+  
 }
 
 exports = pkgs;
