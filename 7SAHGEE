@@ -1,0 +1,285 @@
+var table = ee.FeatureCollection("projects/ee-liuhj946/assets/Hazard/Hazard_2004"),
+    table2 = ee.FeatureCollection("projects/ee-liuhj946/assets/Hazard/Hazard_2005"),
+    table3 = ee.FeatureCollection("projects/ee-liuhj946/assets/Hazard/Hazard_2006"),
+    table4 = ee.FeatureCollection("projects/ee-liuhj946/assets/Hazard/Hazard_2007"),
+    table5 = ee.FeatureCollection("projects/ee-liuhj946/assets/Hazard/Hazard_2008"),
+    table6 = ee.FeatureCollection("projects/ee-liuhj946/assets/Hazard/Hazard_2009"),
+    table7 = ee.FeatureCollection("projects/ee-liuhj946/assets/Hazard/Hazard_2010"),
+    table8 = ee.FeatureCollection("projects/ee-liuhj946/assets/GPX0410"),
+    table9 = ee.FeatureCollection("projects/ee-liuhj946/assets/STCV/stcv_sus0"),
+    table10 = ee.FeatureCollection("projects/ee-liuhj946/assets/STCV/stcv_sus1"),
+    table11 = ee.FeatureCollection("projects/ee-liuhj946/assets/STCV/stcv_sus2"),
+    table12 = ee.FeatureCollection("projects/ee-liuhj946/assets/STCV/stcv_sus3"),
+    table13 = ee.FeatureCollection("projects/ee-liuhj946/assets/STCV/stcv_area0"),
+    table14 = ee.FeatureCollection("projects/ee-liuhj946/assets/STCV/stcv_area1"),
+    table15 = ee.FeatureCollection("projects/ee-liuhj946/assets/STCV/stcv_area2"),
+    table16 = ee.FeatureCollection("projects/ee-liuhj946/assets/STCV/stcv_area3");
+
+var pkgs = require('users/liuhj946/susceptibility:0pkgs');
+var Visualization = require('users/liuhj946/susceptibility:6Visualization');
+
+var LS_columns = ['Slo_mean','Slo_std','Ele_mean','Ele_std','Nss_mean','Nss_std','Ess_mean','Ess_std',
+                  'HCv_mean','HCv_std','VCv_mean','VCv_std','rain_mean','ndvi_mean','ndvi_std','year_norm'];
+                  
+var LA_columns = ['Ele_std','Ele_mean','Slo_std','Slo_mean','Nss_std','Nss_mean','Ess_std','Ess_mean',
+                  'HCv_std','HCv_mean','VCv_std','VCv_mean','ndvi_std','ndvi_mean','rain_mean',
+                  'PA','PSA','DA','DSA','D','P','A','Twi_mean','Twi_std','Vrm_mean','Vrm_std',
+                  'Rou_mean','Rou_std','Tri_mean','Tri_std','year_norm'];
+
+var yearList = ee.List([2004,2005,2006,2007,2008,2009,2010]);
+var grids = pkgs.generateGrid(table8, 2, 2);
+var dataCol = ee.FeatureCollection([table,table2,table3,table4,table5,table6,table7]).flatten();
+//===============================================================================
+// 易发性矢量集合
+var LS_Tables = {
+  'Landslide Susceptibility 2004':table,
+  'Landslide Susceptibility 2005':table2,
+  'Landslide Susceptibility 2006':table3,
+  'Landslide Susceptibility 2007':table4,
+  'Landslide Susceptibility 2008':table5,
+  'Landslide Susceptibility 2009':table6,
+  'Landslide Susceptibility 2010':table7
+};
+// 总的易发性矢量结果集合
+var ls_col = dataCol;
+// var susList = [0.25, 0.50, 0.75, 0.95];
+// var lsQuantile = pkgs.quantile(ls_col, susList, 'LS');
+// kmeans分级
+var lsQuantile = pkgs.kmeans(ls_col , 'LS', 5);
+// 易发性等级占比统计
+var l2004 = pkgs.statistics(table, 'LS', 'area', 2004, lsQuantile);
+var l2005 = pkgs.statistics(table2, 'LS', 'area', 2005, lsQuantile);
+var l2006 = pkgs.statistics(table3, 'LS', 'area', 2006, lsQuantile);
+var l2007 = pkgs.statistics(table4, 'LS', 'area', 2007, lsQuantile);
+var l2008 = pkgs.statistics(table5, 'LS', 'area', 2008, lsQuantile);
+var l2009 = pkgs.statistics(table6, 'LS', 'area', 2009, lsQuantile);
+var l2010 = pkgs.statistics(table7, 'LS', 'area', 2010, lsQuantile);
+var lsClass = ee.FeatureCollection([l2004,l2005,l2006,l2007,l2008,l2009,l2010]).flatten();
+// 易发性分级颜色
+var susColors = ee.Dictionary({
+    1: {color:'2e7d32'},
+    2: {color:'66bb6a'},
+    3: {color:'fff176'},
+    4: {color:'ffa726'},
+    5: {color:'e53935'},
+  });
+// 根据分位数生成每年的易发性栅格结果集合
+var LS_2004 = Visualization.tableVis(table,  'LS', lsQuantile, susColors);
+var LS_2005 = Visualization.tableVis(table2, 'LS', lsQuantile, susColors);
+var LS_2006 = Visualization.tableVis(table3, 'LS', lsQuantile, susColors);
+var LS_2007 = Visualization.tableVis(table4, 'LS', lsQuantile, susColors);
+var LS_2008 = Visualization.tableVis(table5, 'LS', lsQuantile, susColors);
+var LS_2009 = Visualization.tableVis(table6, 'LS', lsQuantile, susColors);
+var LS_2010 = Visualization.tableVis(table7, 'LS', lsQuantile, susColors);
+var LS_Images = {
+  'LS 2004':LS_2004,
+  'LS 2005':LS_2005,
+  'LS 2006':LS_2006,
+  'LS 2007':LS_2007,
+  'LS 2008':LS_2008,
+  'LS 2009':LS_2009,
+  'LS 2010':LS_2010
+};
+
+// 计算易发性每年的混淆矩阵
+var matrix2004 = Visualization.tfpnVis(table);
+var matrix2005 = Visualization.tfpnVis(table2);
+var matrix2006 = Visualization.tfpnVis(table3);
+var matrix2007 = Visualization.tfpnVis(table4);
+var matrix2008 = Visualization.tfpnVis(table5);
+var matrix2009 = Visualization.tfpnVis(table6);
+var matrix2010 = Visualization.tfpnVis(table7);
+// 易发性每年混淆矩阵结果集合
+var matrixImages = {
+  'Matrix 2004':matrix2004,
+  'Matrix 2005':matrix2005,
+  'Matrix 2006':matrix2006,
+  'Matrix 2007':matrix2007,
+  'Matrix 2008':matrix2008,
+  'Matrix 2009':matrix2009,
+  'Matrix 2010':matrix2010  
+};
+// 空间分块序列
+var serial = {
+  'Zone 1': 0,
+  'Zone 2': 1,
+  'Zone 3': 2,
+  'Zone 4': 3
+};
+// 易发性时空结果
+var stcvSUSTables = {
+  'Zone 1': table9,
+  'Zone 2': table10,
+  'Zone 3': table11,
+  'Zone 4': table12
+};
+//==============================================================================
+// 规模矢量集合
+var LA_Tables = {
+  'Landslide Area 2004':table,
+  'Landslide Area 2005':table2,
+  'Landslide Area 2006':table3,
+  'Landslide Area 2007':table4,
+  'Landslide Area 2008':table5,
+  'Landslide Area 2009':table6,
+  'Landslide Area 2010':table7
+};
+// 合并面积结果
+var LA_merge = dataCol;
+// 分位数分级
+// var areaList = [0.25, 0.50, 0.75, 0.95];
+// var areaQuantile = pkgs.quantile(LA_merge, areaList, 'LA');
+var areaQuantile = ee.List([8, 8.5, 9, 9.5, 10, 10.5, 11]);
+// 面积分级颜色
+var areaColors = ee.Dictionary({
+    1: {color:'4676B4'},
+    2: {color:'73ABD1'},
+    3: {color:'ABD9E9'},
+    4: {color:'E1F2F9'},
+    5: {color:'FDE090'},
+    6: {color:'FDAE63'},
+    7: {color:'F36C42'},
+    8: {color:'D60000'}
+  });
+// 生成每年的面积栅格结果集合
+var LA_2004 = Visualization.areaTableVis(table,  'LA', areaQuantile, areaColors);
+var LA_2005 = Visualization.areaTableVis(table2, 'LA', areaQuantile, areaColors);
+var LA_2006 = Visualization.areaTableVis(table3, 'LA', areaQuantile, areaColors);
+var LA_2007 = Visualization.areaTableVis(table4, 'LA', areaQuantile, areaColors);
+var LA_2008 = Visualization.areaTableVis(table5, 'LA', areaQuantile, areaColors);
+var LA_2009 = Visualization.areaTableVis(table6, 'LA', areaQuantile, areaColors);
+var LA_2010 = Visualization.areaTableVis(table7, 'LA', areaQuantile, areaColors);
+var LA_Images = {
+  'LA 2004':LA_2004,
+  'LA 2005':LA_2005,
+  'LA 2006':LA_2006,
+  'LA 2007':LA_2007,
+  'LA 2008':LA_2008,
+  'LA 2009':LA_2009,
+  'LA 2010':LA_2010
+};
+// 规模时空结果
+var stcvAreaTables = {
+  'Zone 1': table13,
+  'Zone 2': table14,
+  'Zone 3': table15,
+  'Zone 4': table16
+};
+//=============================================================================================
+// 合并所有年份的危险性
+var Hazard_merge = dataCol;
+// 分位数分级
+// var hazardList = [0.25, 0.50, 0.75, 0.95];
+// var hazardQuantile = pkgs.quantile(Hazard_merge, hazardList, 'hazard');
+// kmeans分级
+var hazardQuantile = pkgs.kmeans(Hazard_merge , 'hazard', 5);
+// 危险性等级占比统计
+var h2004 = pkgs.statistics(table,  'hazard', 'area', 2004, hazardQuantile);
+var h2005 = pkgs.statistics(table2, 'hazard', 'area', 2005, hazardQuantile);
+var h2006 = pkgs.statistics(table3, 'hazard', 'area', 2006, hazardQuantile);
+var h2007 = pkgs.statistics(table4, 'hazard', 'area', 2007, hazardQuantile);
+var h2008 = pkgs.statistics(table5, 'hazard', 'area', 2008, hazardQuantile);
+var h2009 = pkgs.statistics(table6, 'hazard', 'area', 2009, hazardQuantile);
+var h2010 = pkgs.statistics(table7, 'hazard', 'area', 2010, hazardQuantile);
+var hazardclass = ee.FeatureCollection([h2004,h2005,h2006,h2007,h2008,h2009,h2010]).flatten();
+// 危险性分级颜色
+var hazardColors = ee.Dictionary({
+    1: {color:'2e7d32'},
+    2: {color:'66bb6a'},
+    3: {color:'fff176'},
+    4: {color:'ffa726'},
+    5: {color:'e53935'},
+  });
+// 生成危险性栅格影像集合
+var Hazard_2004 = Visualization.tableVis(table, 'hazard', hazardQuantile, hazardColors);
+var Hazard_2005 = Visualization.tableVis(table2, 'hazard', hazardQuantile, hazardColors);
+var Hazard_2006 = Visualization.tableVis(table3, 'hazard', hazardQuantile, hazardColors);
+var Hazard_2007 = Visualization.tableVis(table4, 'hazard', hazardQuantile, hazardColors);
+var Hazard_2008 = Visualization.tableVis(table5, 'hazard', hazardQuantile, hazardColors);
+var Hazard_2009 = Visualization.tableVis(table6, 'hazard', hazardQuantile, hazardColors);
+var Hazard_2010 = Visualization.tableVis(table7, 'hazard', hazardQuantile, hazardColors);
+var Hazard_Images = {
+  'Hazard 2004':Hazard_2004,
+  'Hazard 2005':Hazard_2005,
+  'Hazard 2006':Hazard_2006,
+  'Hazard 2007':Hazard_2007,
+  'Hazard 2008':Hazard_2008,
+  'Hazard 2009':Hazard_2009,
+  'Hazard 2010':Hazard_2010
+}
+//=============================================================================================
+var d2004 = table8.filter(ee.Filter.eq('year',1));
+var d2005 = table8.filter(ee.Filter.eq('year',2));
+var d2006 = table8.filter(ee.Filter.eq('year',3));
+var d2007 = table8.filter(ee.Filter.eq('year',4));
+var d2008 = table8.filter(ee.Filter.eq('year',5));
+var d2009 = table8.filter(ee.Filter.eq('year',6));
+var d2010 = table8.filter(ee.Filter.eq('year',7));
+var Tables = ee.FeatureCollection([d2004,d2005,d2006,d2007,d2008,d2009,d2010]).flatten();
+// 易发性动画影像集合
+var animation_col = ee.ImageCollection.fromImages([LS_2004,LS_2005,LS_2006,LS_2007,LS_2008,LS_2009,LS_2010]);
+// 易发性/危险性影像可视化参数
+var visParam = {min:0,max:1,palette:['2e7d32','66bb6a','fff176','ffa726','e53935']};
+// 面积影像可视化参数
+var areaParam = {min:0,max:1,palette:['4676B4','73ABD1','ABD9E9','E1F2F9','FDE090','FDAE63','F36C42','D60000']};
+// 危险性影像集合
+var hazard_col = ee.ImageCollection.fromImages([Hazard_Images['Hazard 2004'],Hazard_Images['Hazard 2005'],
+                    Hazard_Images['Hazard 2006'],Hazard_Images['Hazard 2007'],Hazard_Images['Hazard 2008'],
+                    Hazard_Images['Hazard 2009'],Hazard_Images['Hazard 2010']]);
+//============================================================================================
+var show = function(){
+  //左侧地图
+  var leftMap = ui.Map();
+  //加载滑坡因子相关性面板
+  Visualization.correlation(Tables, LS_columns, leftMap);
+  //加载易发性统计图
+  Visualization.susChange(lsClass, leftMap);
+  //加载易发性面板
+  Visualization.LSSelector(LS_Images, matrixImages, LS_Tables, table8, stcvSUSTables, LS_columns, grids, serial, leftMap);
+  //加载易发性/混淆矩阵图例                          
+  Visualization.LegendLeft(visParam, leftMap);
+  //易发性动画面板
+  Visualization.animation(animation_col,'SUS',yearList,'year',leftMap);
+  //去除原生的缩放、绘制空间
+  leftMap.setControlVisibility({zoomControl: false, drawingToolsControl: false});
+  
+  //右侧地图
+  var rightMap = ui.Map();
+  //加载危险性统计图
+  Visualization.hazardChange(hazardclass,rightMap);
+  //加载规模/危险性图例
+  Visualization.LegendRight(areaParam, visParam, rightMap);
+  //加载规模面板
+  Visualization.LAMapSelector(LA_Images, LA_Tables, table8, stcvAreaTables, LA_columns, grids, serial, rightMap);
+  //加载危险性
+  Visualization.HazardSelector(Hazard_Images, rightMap);
+  //危险性动画面板
+  Visualization.animation(hazard_col,'HD',yearList,'year',rightMap);
+  //去除原生的缩放、绘制空间
+  rightMap.setControlVisibility({fullscreenControl: false});
+  
+  //左右地图连接
+  var linker = ui.Map.Linker([leftMap,rightMap]);
+  var splitPanel = ui.SplitPanel({
+        firstPanel: leftMap,
+        secondPanel: rightMap,
+        orientation: 'horizontal',
+        wipe: true,
+      });
+  ui.root.widgets().reset([splitPanel]);
+  leftMap.centerObject(table8, 10);
+}
+show();
+// var first_SU = table8.filter(ee.Filter.eq('year', 1));
+// Map.addLayer(first_SU, {color: '3a86ff'}, 'slope units');
+// Map.addLayer(grids, {color: 'f2cc8f'}, 'grids');
+// Map.centerObject(table8,10);
+
+// var button = ui.Button({
+//   label: 'Run Analysis',
+//   onClick: function() {
+//     show();
+//   },
+//   style:{backgroundColor :'a8dadc', fontWeight:'bold'}
+// });
+// Map.add(button);
