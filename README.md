@@ -13,13 +13,15 @@ Display Tool
 ![image](https://github.com/user-attachments/assets/2b3e5c47-7065-4ada-86aa-48774231d308)
 ![image](https://github.com/user-attachments/assets/7d3e4854-4acf-461d-b507-0d17c66bc8c8)
 ![image](https://github.com/user-attachments/assets/db7210ac-c909-4922-abb4-34af8a9f3814)
-![image](https://github.com/user-attachments/assets/fae051b3-8d00-47d5-a549-79a15edd8fe8)
-
-
+![image](https://github.com/user-attachments/assets/33d4e895-b4cc-4c29-891f-d96301a8fc88)
+![image](https://github.com/user-attachments/assets/ec9a6312-09c0-4007-a08a-27fb323c9bbe)
+![image](https://github.com/user-attachments/assets/ea68b7f2-eceb-4ea5-a998-e611e4353701)
+![image](https://github.com/user-attachments/assets/2cd43383-b4f2-45ee-95c4-62cdd0e65ec1)
+![image](https://github.com/user-attachments/assets/51316a4b-9fd6-4dbe-a6e5-5fd96d642cfb)
 
 Use
 ===
-You can access the tool in GEE through this [link](https://ee-liuhj946.projects.earthengine.app/view/sahgee) and there is no need to register for a GEE account.
+Everyone can access the tool in GEE through this [link](https://ee-liuhj946.projects.earthengine.app/view/sahgee) and there is no need to register for a GEE account.
 
 Cite
 ===
