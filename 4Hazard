@@ -1,0 +1,64 @@
+var table = ee.FeatureCollection("projects/ee-liuhj946/assets/LS/LS_2004"),
+    table2 = ee.FeatureCollection("projects/ee-liuhj946/assets/LS/LS_2005"),
+    table3 = ee.FeatureCollection("projects/ee-liuhj946/assets/LS/LS_2006"),
+    table4 = ee.FeatureCollection("projects/ee-liuhj946/assets/LS/LS_2007"),
+    table5 = ee.FeatureCollection("projects/ee-liuhj946/assets/LS/LS_2008"),
+    table6 = ee.FeatureCollection("projects/ee-liuhj946/assets/LS/LS_2009"),
+    table7 = ee.FeatureCollection("projects/ee-liuhj946/assets/LS/LS_2010"),
+    table8 = ee.FeatureCollection("projects/ee-liuhj946/assets/LA/SA_2004"),
+    table9 = ee.FeatureCollection("projects/ee-liuhj946/assets/LA/SA_2005"),
+    table10 = ee.FeatureCollection("projects/ee-liuhj946/assets/LA/SA_2006"),
+    table11 = ee.FeatureCollection("projects/ee-liuhj946/assets/LA/SA_2007"),
+    table12 = ee.FeatureCollection("projects/ee-liuhj946/assets/LA/SA_2008"),
+    table13 = ee.FeatureCollection("projects/ee-liuhj946/assets/LA/SA_2009"),
+    table14 = ee.FeatureCollection("projects/ee-liuhj946/assets/LA/SA_2010");
+
+var pkgs = require('users/liuhj946/susceptibility:0pkgs');
+var hazard = function(lsTable, areaTable){
+  var res = lsTable.map(function(f1){
+    var f2 = areaTable.filter(ee.Filter.eq('id', f1.getNumber('id')));
+    var LA = f2.first().getNumber('LA');
+    var SLA = f2.first().getNumber('SLA');
+    var LS = f1.getNumber('LS');
+    var hazard = LS.multiply(SLA);
+    var ls_area = f2.first().getNumber('ls_area');
+    return f1.set('LA', LA ).set('ls_area',ls_area).set('hazard', hazard);
+  });
+  return res;
+}
+
+var lsTables = [table,table2,table3,table4,table5,table6,table7];
+var areaTables = [table8,table9,table10,table11,table12,table13,table14];
+
+// LS × LA = Hazard
+var H2004 = hazard(lsTables[0], areaTables[0]);
+var H2005 = hazard(lsTables[1], areaTables[1]);
+var H2006 = hazard(lsTables[2], areaTables[2]);
+var H2007 = hazard(lsTables[3], areaTables[3]);
+var H2008 = hazard(lsTables[4], areaTables[4]);
+var H2009 = hazard(lsTables[5], areaTables[5]);
+var H2010 = hazard(lsTables[6], areaTables[6]);
+  
+// 合并所有年份的危险性
+var Hazard_merge = ee.FeatureCollection([H2004,H2005,H2006,H2007,H2008,H2009,H2010]).flatten();
+// 将危险性归一化
+var Hazard_FC = pkgs.standardization(Hazard_merge, 'hazard', 'hazard');
+// 将归一化后的危险性值重新分配为每年
+var HD2004 = Hazard_FC.filter(ee.Filter.eq('year',1));
+var HD2005 = Hazard_FC.filter(ee.Filter.eq('year',2));
+var HD2006 = Hazard_FC.filter(ee.Filter.eq('year',3));
+var HD2007 = Hazard_FC.filter(ee.Filter.eq('year',4));
+var HD2008 = Hazard_FC.filter(ee.Filter.eq('year',5));
+var HD2009 = Hazard_FC.filter(ee.Filter.eq('year',6));
+var HD2010 = Hazard_FC.filter(ee.Filter.eq('year',7));
+
+var HazardList = [HD2004,HD2005,HD2006,HD2007,HD2008,HD2009,HD2010];
+var nameList = ['Hazard_2004','Hazard_2005','Hazard_2006','Hazard_2007','Hazard_2008','Hazard_2009','Hazard_2010'];
+  
+for (var i =0; i<HazardList.length; i++){
+  Export.table.toAsset({
+		collection:HazardList[i],
+    description:nameList[i],
+    assetId:'Hazard/' + nameList[i]
+  })
+}
