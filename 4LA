@@ -1,0 +1,73 @@
+var pkgs = require('users/liuhj946/susceptibility:0pkgs');
+
+var data = ee.FeatureCollection("projects/ee-liuhj946/assets/GPX0410");
+
+var log = function(feature){
+  var value = feature.get('ls_area');
+  var v;
+  if(value == 0){
+    v = 1;
+  }else{
+    v = value;
+  }
+  var logValue = ee.Number(v).log();
+  return feature.set('ls_area', logValue); // 将对数值替换到规模标签
+}
+
+var LA = function(col, year, LA_columns){
+  // 计算滑坡规模，属性名为LA
+  var LA = function(year){
+    //训练样本
+    var traindata = col.filter(ee.Filter.neq('year',year));
+    traindata = traindata.filter(ee.Filter.gt('ls_area', 0));
+    traindata = traindata.map(log);
+    //测试样本
+    var testdata = col.filter(ee.Filter.eq('year',year));
+    testdata = testdata.map(log);
+    var classifier = ee.Classifier.smileRandomForest(300).train({
+        features: traindata,
+        classProperty: 'ls_area',
+        inputProperties: LA_columns
+      });
+    var rf_classifier = classifier.setOutputMode('REGRESSION');
+    var areaFit = testdata.classify(rf_classifier,'LA').select(['id','LA','year','ls_area','area']);
+    return areaFit;
+  };
+  return LA(year)
+}
+
+var LA_columns = ['Ele_std','Ele_mean','Slo_std','Slo_mean','Nss_std','Nss_mean','Ess_std','Ess_mean',
+                  'HCv_std','HCv_mean','VCv_std','VCv_mean','ndvi_std','ndvi_mean','rain_mean',
+                  'PA','PSA','DA','DSA','D','P','A','Twi_mean','Twi_std','Vrm_mean','Vrm_std',
+                  'Rou_mean','Rou_std','Tri_mean','Tri_std','year_norm'];
+                  
+var LA2004 = LA(data, 1, LA_columns);
+var LA2005 = LA(data, 2, LA_columns);
+var LA2006 = LA(data, 3, LA_columns);
+var LA2007 = LA(data, 4, LA_columns);
+var LA2008 = LA(data, 5, LA_columns);
+var LA2009 = LA(data, 6, LA_columns);
+var LA2010 = LA(data, 7, LA_columns);
+// 合并面积结果
+var area_col = ee.FeatureCollection([LA2004,LA2005,LA2006,LA2007,LA2008,LA2009,LA2010]).flatten();
+
+// 对预测面积值归一化
+var LA_FC = pkgs.standardization(area_col, 'LA', 'SLA');
+// 将面积归一化后的结果重新分配到每年
+var SA2004 = LA_FC.filter(ee.Filter.eq('year',1));
+var SA2005 = LA_FC.filter(ee.Filter.eq('year',2));
+var SA2006 = LA_FC.filter(ee.Filter.eq('year',3));
+var SA2007 = LA_FC.filter(ee.Filter.eq('year',4));
+var SA2008 = LA_FC.filter(ee.Filter.eq('year',5));
+var SA2009 = LA_FC.filter(ee.Filter.eq('year',6));
+var SA2010 = LA_FC.filter(ee.Filter.eq('year',7));
+// 保存面积预测结果
+var SAlist = [SA2004, SA2005, SA2006, SA2007, SA2008, SA2009, SA2010];
+var SAName = ['SA_2004','SA_2005','SA_2006','SA_2007','SA_2008','SA_2009','SA_2010'];
+for (var i =0; i<SAlist.length; i++){
+  Export.table.toAsset({
+		collection:SAlist[i],
+    description:SAName[i],
+    assetId:'LA/' + SAName[i]
+  })
+}
